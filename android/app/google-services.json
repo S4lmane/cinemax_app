@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "453232426588",
+    "project_id": "movie-app-dee59",
+    "storage_bucket": "movie-app-dee59.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:453232426588:android:48ad5d256b2130cb973099",
+        "android_client_info": {
+          "package_name": "com.example.cinemaxappp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDka8kj835qqeeEKDmdo6uaebx56sTxBGw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

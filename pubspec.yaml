@@ -1,0 +1,76 @@
+name: cinemaxappp
+description: "Your go to application for movies & tv shows."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.7.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Firebase
+  #firebase_core: ^2.27.0
+  #firebase_auth: ^4.17.8
+  #cloud_firestore: ^4.15.8
+  #firebase_storage: ^11.6.9
+  firebase_core: ^2.25.0
+  firebase_auth: ^4.16.0
+  cloud_firestore: ^4.14.0
+  firebase_storage: ^11.6.0
+
+  # State Management
+  provider: ^6.1.2
+
+  # UI
+  cupertino_icons: ^1.0.8
+  carousel_slider: ^4.2.1
+  smooth_page_indicator: ^1.1.0
+  cached_network_image: ^3.3.1
+  flutter_rating_bar: ^4.0.1
+  shimmer: ^3.0.0
+
+  # HTTP
+  http: ^1.2.1
+  dio: ^5.4.1
+
+  # Utils
+  intl: ^0.19.0
+  url_launcher: ^6.2.5
+  shared_preferences: ^2.2.2
+
+  # SVG
+  flutter_svg: ^2.0.10+1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/icons/
+
+  fonts:
+    - family: Montserrat
+      fonts:
+        - asset: assets/fonts/Montserrat-Regular.ttf
+        - asset: assets/fonts/Montserrat-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Montserrat-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Montserrat-Medium.ttf
+          weight: 500
+
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+        - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Roboto-Medium.ttf
+          weight: 500
