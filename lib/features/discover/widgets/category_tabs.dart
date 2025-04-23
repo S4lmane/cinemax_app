@@ -15,26 +15,35 @@ class CategoryTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      margin: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: TabBar(
         controller: controller,
-        indicator: UnderlineTabIndicator(
-          borderSide: const BorderSide(
-            color: AppColors.primary,
-            width: 3.0,
-          ),
-          insets: EdgeInsets.only(
-            right: MediaQuery.of(context).size.width / tabs.length - 30,
-            left: 10,
-          ),
+        indicator: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: AppColors.primary,
         ),
-        labelColor: AppColors.textPrimary,
+        labelColor: Colors.black,
         unselectedLabelColor: AppColors.textSecondary,
-        labelStyle: TextStyles.headline6,
+        labelStyle: TextStyles.headline6.copyWith(
+          fontWeight: FontWeight.bold,
+        ),
         unselectedLabelStyle: TextStyles.headline6.copyWith(
           fontWeight: FontWeight.w400,
         ),
-        tabs: tabs.map((tab) => Tab(text: tab)).toList(),
+        dividerColor: Colors.transparent,
+        padding: const EdgeInsets.all(4),
+        tabs: tabs.map((tab) =>
+            Tab(
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(tab),
+              ),
+            )
+        ).toList(),
       ),
     );
   }

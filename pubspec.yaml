@@ -16,10 +16,26 @@ dependencies:
   #firebase_auth: ^4.17.8
   #cloud_firestore: ^4.15.8
   #firebase_storage: ^11.6.9
-  firebase_core: ^2.25.0
-  firebase_auth: ^4.16.0
-  cloud_firestore: ^4.14.0
-  firebase_storage: ^11.6.0
+
+  # in case the fire base did'nt work ZID HADO
+  #firebase_core: ^2.25.0
+  #firebase_auth: ^4.16.0
+  #cloud_firestore: ^4.14.0
+  #firebase_storage: ^11.6.0
+
+  firebase_core: ^2.27.0
+  firebase_auth: ^4.17.8
+  cloud_firestore: ^4.15.8
+  firebase_storage: ^11.6.9
+
+  # Image handling
+  image_picker: ^1.0.7
+  image_cropper: ^5.0.1
+  path_provider: ^2.1.2
+
+  # Utils
+  share_plus: ^7.2.2
+  uuid: ^4.3.3
 
   # State Management
   provider: ^6.1.2

@@ -14,60 +14,60 @@ class CustomBottomNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      height: 70,
       decoration: BoxDecoration(
         color: AppColors.bottomNavBackground,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.2),
             blurRadius: 10,
-            offset: const Offset(0, -5),
+            offset: const Offset(0, -3),
           ),
         ],
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(
-                icon: Icons.movie_outlined,
-                label: 'Discover',
-                index: 0,
-              ),
-              _buildNavItem(
-                icon: Icons.search,
-                label: 'Search',
-                index: 1,
-              ),
-            ],
-          ),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
         ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildNavItem(
+            icon: Icons.movie_outlined,
+            activeIcon: Icons.movie,
+            label: 'Discover',
+            index: 0,
+          ),
+          _buildNavItem(
+            icon: Icons.search_outlined,
+            activeIcon: Icons.search,
+            label: 'Search',
+            index: 1,
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildNavItem({
     required IconData icon,
+    required IconData activeIcon,
     required String label,
     required int index,
   }) {
     final isSelected = currentIndex == index;
 
-    return InkWell(
+    return GestureDetector(
       onTap: () => onTap(index),
-      borderRadius: BorderRadius.circular(16),
+      behavior: HitTestBehavior.opaque,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary.withOpacity(0.15) : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
+        width: 80,
+        padding: const EdgeInsets.symmetric(vertical: 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              icon,
+              isSelected ? activeIcon : icon,
               color: isSelected ? AppColors.primary : AppColors.textSecondary,
               size: 26,
             ),
@@ -75,9 +75,9 @@ class CustomBottomNavBar extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                color: isSelected ? AppColors.primary : AppColors.textSecondary,
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? AppColors.primary : AppColors.textSecondary,
               ),
             ),
           ],
