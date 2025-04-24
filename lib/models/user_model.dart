@@ -25,7 +25,6 @@ class UserModel {
     required this.lastLoginAt,
   });
 
-  // Create a user from Firebase Auth user
   factory UserModel.fromMap(Map<String, dynamic> map, String uid) {
     return UserModel(
       uid: uid,
@@ -45,7 +44,6 @@ class UserModel {
     );
   }
 
-  // Convert user to map for storing in Firestore
   Map<String, dynamic> toMap() {
     return {
       'email': email,
@@ -60,7 +58,6 @@ class UserModel {
     };
   }
 
-  // Create a copy of the user model with updated fields
   UserModel copyWith({
     String? nickname,
     String? profileImageUrl,

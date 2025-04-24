@@ -19,7 +19,7 @@ class AuthProvider extends ChangeNotifier {
   bool get isAuthenticated => _user != null;
   String? get error => _error;
 
-  // Initialize auth state
+  // Initialisation auth state
   Future<void> _initialize() async {
     _authService.authStateChanges.listen((User? user) {
       _user = user;
