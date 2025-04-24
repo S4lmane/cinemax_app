@@ -113,6 +113,7 @@ class MovieCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  /* // bloc the year and the genres
                   const SizedBox(height: 4),
                   Row(
                     children: [
@@ -135,6 +136,7 @@ class MovieCard extends StatelessWidget {
                       ),
                     ],
                   ),
+                  */
                 ],
               ),
             ),

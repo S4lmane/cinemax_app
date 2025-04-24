@@ -1,14 +1,17 @@
+// lib/core/services/user_service.dart
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../../models/user_model.dart';
 import '../../models/list_model.dart';
+import 'storage_service.dart';
 
 class UserService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  late final StorageService _storageService = StorageService();
 
   // Collection references
   CollectionReference get _usersCollection => _firestore.collection('users');
@@ -16,6 +19,13 @@ class UserService {
       _usersCollection.doc(userId).collection('lists');
   CollectionReference getUserWatchlistCollection(String userId) =>
       _usersCollection.doc(userId).collection('watchlist');
+  CollectionReference getUserFavoritesCollection(String userId) =>
+      _usersCollection.doc(userId).collection('favorites');
+
+  // Get the storage service instance
+  Future<StorageService> getStorageService() async {
+    return _storageService;
+  }
 
   // Create a new user in Firestore
   Future<void> createUserProfile({
@@ -123,7 +133,7 @@ class UserService {
   }
 
   // Create a new list
-  Future<ListModel> createList({
+  Future<ListModel?> createList({
     required String name,
     required String description,
     required bool isPublic,
@@ -152,9 +162,141 @@ class UserService {
       'itemCount': 0,
     };
 
-    final docRef = await getUserListsCollection(userId).add(listData);
+    try {
+      final docRef = await getUserListsCollection(userId).add(listData);
+      return ListModel.fromMap(listData, docRef.id);
+    } catch (e) {
+      print('Error creating list: $e');
+      return null;
+    }
+  }
 
-    return ListModel.fromMap(listData, docRef.id);
+  // Update list cover image
+  Future<bool> updateListCover(String userId, String listId, String imageUrl) async {
+    try {
+      await getUserListsCollection(userId).doc(listId).update({
+        'coverImageUrl': imageUrl,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      return true;
+    } catch (e) {
+      print('Error updating list cover: $e');
+      return false;
+    }
+  }
+
+  // Delete a list
+  Future<bool> deleteList(String listId) async {
+    try {
+      final User? currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        return false;
+      }
+
+      // Get the list to check ownership
+      final listDoc = await getUserListsCollection(currentUser.uid).doc(listId).get();
+      if (!listDoc.exists) {
+        return false;
+      }
+
+      final listData = listDoc.data() as Map<String, dynamic>;
+      if (listData['userId'] != currentUser.uid) {
+        // Only the owner can delete the list
+        return false;
+      }
+
+      // Delete list cover image if exists
+      final coverImageUrl = listData['coverImageUrl'] as String;
+      if (coverImageUrl.isNotEmpty) {
+        try {
+          final ref = _storage.refFromURL(coverImageUrl);
+          await ref.delete();
+        } catch (e) {
+          // Ignore errors when deleting images
+          print('Error deleting list cover image: $e');
+        }
+      }
+
+      // Delete the list document
+      await getUserListsCollection(currentUser.uid).doc(listId).delete();
+      return true;
+    } catch (e) {
+      print('Error deleting list: $e');
+      return false;
+    }
+  }
+
+  // Add item to list
+  Future<bool> addItemToList({
+    required String listId,
+    required String itemId,
+    required bool isMovie,
+  }) async {
+    try {
+      final User? currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        return false;
+      }
+
+      final listRef = getUserListsCollection(currentUser.uid).doc(listId);
+      final listDoc = await listRef.get();
+
+      if (!listDoc.exists) {
+        return false;
+      }
+
+      final listData = listDoc.data() as Map<String, dynamic>;
+      final List<String> itemIds = List<String>.from(listData['itemIds'] ?? []);
+
+      // Check if item already exists in the list
+      if (itemIds.contains(itemId)) {
+        return true; // Item already exists, consider it success
+      }
+
+      // Update the list
+      await listRef.update({
+        'itemIds': FieldValue.arrayUnion([itemId]),
+        'itemCount': FieldValue.increment(1),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      return true;
+    } catch (e) {
+      print('Error adding item to list: $e');
+      return false;
+    }
+  }
+
+  // Remove item from list
+  Future<bool> removeItemFromList({
+    required String listId,
+    required String itemId,
+  }) async {
+    try {
+      final User? currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        return false;
+      }
+
+      final listRef = getUserListsCollection(currentUser.uid).doc(listId);
+      final listDoc = await listRef.get();
+
+      if (!listDoc.exists) {
+        return false;
+      }
+
+      // Update the list
+      await listRef.update({
+        'itemIds': FieldValue.arrayRemove([itemId]),
+        'itemCount': FieldValue.increment(-1),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      return true;
+    } catch (e) {
+      print('Error removing item from list: $e');
+      return false;
+    }
   }
 
   // Check if user is a moderator

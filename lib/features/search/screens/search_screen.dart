@@ -1,3 +1,4 @@
+// lib/features/search/screens/search_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
@@ -6,7 +7,12 @@ import '../../../core/widgets/loading_indicator.dart';
 import '../providers/search_provider.dart';
 import '../widgets/search_bar.dart';
 import '../widgets/search_result_item.dart';
+import '../widgets/filter_chip_group.dart';
+import '../widgets/search_filters.dart';
 import '../../movie_details/screens/movie_details_screen.dart';
+import '../../movie_details/providers/movie_details_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({Key? key}) : super(key: key);
@@ -19,11 +25,20 @@ class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   bool _showClearButton = false;
+  List<String> _searchHistory = [];
+  bool _isFilterOpen = false;
+
+  // Filter states
+  String _contentType = 'all'; // 'all', 'movies', 'tv'
+  String _selectedGenre = 'all';
+  RangeValues _yearRange = RangeValues(1900, DateTime.now().year.toDouble());
+  double _minRating = 0.0;
 
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    _loadSearchHistory();
   }
 
   @override
@@ -32,6 +47,55 @@ class _SearchScreenState extends State<SearchScreen> {
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  // Load search history from SharedPreferences
+  Future<void> _loadSearchHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final history = prefs.getStringList('search_history') ?? [];
+      setState(() {
+        _searchHistory = history;
+      });
+    } catch (e) {
+      print('Error loading search history: $e');
+    }
+  }
+
+  // Save search history to SharedPreferences
+  Future<void> _saveSearchHistory(String query) async {
+    if (query.isEmpty) return;
+
+    try {
+      // Add to the beginning of list and remove duplicates
+      setState(() {
+        _searchHistory.remove(query);
+        _searchHistory.insert(0, query);
+        // Keep only the latest 10 searches
+        if (_searchHistory.length > 10) {
+          _searchHistory = _searchHistory.sublist(0, 10);
+        }
+      });
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('search_history', _searchHistory);
+    } catch (e) {
+      print('Error saving search history: $e');
+    }
+  }
+
+  // Clear search history
+  Future<void> _clearSearchHistory() async {
+    try {
+      setState(() {
+        _searchHistory = [];
+      });
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('search_history');
+    } catch (e) {
+      print('Error clearing search history: $e');
+    }
   }
 
   void _onSearchChanged() {
@@ -43,11 +107,30 @@ class _SearchScreenState extends State<SearchScreen> {
       // Debounce search
       Future.delayed(const Duration(milliseconds: 500), () {
         if (_searchController.text.length > 2) {
-          Provider.of<SearchProvider>(context, listen: false)
-              .searchMovies(_searchController.text);
+          _performSearch(_searchController.text);
         }
       });
     }
+  }
+
+  void _performSearch(String query) {
+    if (query.isEmpty) return;
+
+    final searchProvider = Provider.of<SearchProvider>(context, listen: false);
+
+    // Apply filters
+    searchProvider.setFilters(
+      contentType: _contentType,
+      genre: _selectedGenre != 'all' ? _selectedGenre : null,
+      startYear: _yearRange.start.toInt(),
+      endYear: _yearRange.end.toInt(),
+      minRating: _minRating,
+    );
+
+    searchProvider.searchMovies(query);
+
+    // Save to search history
+    _saveSearchHistory(query);
   }
 
   void _clearSearch() {
@@ -55,11 +138,39 @@ class _SearchScreenState extends State<SearchScreen> {
     Provider.of<SearchProvider>(context, listen: false).clearSearch();
   }
 
+  void _toggleFilters() {
+    setState(() {
+      _isFilterOpen = !_isFilterOpen;
+    });
+  }
+
+  void _updateFilters({
+    String? contentType,
+    String? genre,
+    RangeValues? yearRange,
+    double? minRating,
+  }) {
+    setState(() {
+      if (contentType != null) _contentType = contentType;
+      if (genre != null) _selectedGenre = genre;
+      if (yearRange != null) _yearRange = yearRange;
+      if (minRating != null) _minRating = minRating;
+    });
+
+    // Apply the filter if a search is active
+    if (_searchController.text.isNotEmpty) {
+      _performSearch(_searchController.text);
+    }
+  }
+
   void _navigateToMovieDetails(String movieId) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => MovieDetailsScreen(movieId: movieId),
+        builder: (context) => ChangeNotifierProvider(
+          create: (_) => MovieDetailsProvider(),
+          child: MovieDetailsScreen(movieId: movieId),
+        ),
       ),
     );
   }
@@ -74,14 +185,105 @@ class _SearchScreenState extends State<SearchScreen> {
             // Search bar
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: CustomSearchBar(
-                controller: _searchController,
-                focusNode: _searchFocusNode,
-                hintText: 'Search for movies or TV shows',
-                showClearButton: _showClearButton,
-                onClear: _clearSearch,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: CustomSearchBar(
+                      controller: _searchController,
+                      focusNode: _searchFocusNode,
+                      hintText: 'Search for movies or TV shows',
+                      showClearButton: _showClearButton,
+                      onClear: _clearSearch,
+                      onSubmitted: () {
+                        if (_searchController.text.isNotEmpty) {
+                          _performSearch(_searchController.text);
+                          FocusScope.of(context).unfocus();
+                        }
+                      },
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      _isFilterOpen ? Icons.filter_list_off : Icons.filter_list,
+                      color: _isFilterOpen ? AppColors.primary : AppColors.textSecondary,
+                    ),
+                    onPressed: _toggleFilters,
+                    tooltip: 'Search Filters',
+                  ),
+                ],
               ),
             ),
+
+            // Filters section (expandable)
+            if (_isFilterOpen)
+              SearchFilters(
+                contentType: _contentType,
+                selectedGenre: _selectedGenre,
+                yearRange: _yearRange,
+                minRating: _minRating,
+                onFilterChanged: _updateFilters,
+              ),
+
+            // Active filters chips (only show when filters are applied)
+            if (_contentType != 'all' || _selectedGenre != 'all' ||
+                _yearRange.start > 1900 || _yearRange.end < DateTime.now().year ||
+                _minRating > 0.0)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Wrap(
+                  spacing: 8,
+                  children: [
+                    if (_contentType != 'all')
+                      FilterChip(
+                        label: Text(_contentType == 'movies' ? 'Movies' : 'TV Shows'),
+                        backgroundColor: AppColors.primary.withOpacity(0.2),
+                        onSelected: (_) {
+                          _updateFilters(contentType: 'all');
+                        },
+                        deleteIcon: const Icon(Icons.close, size: 16),
+                        onDeleted: () {
+                          _updateFilters(contentType: 'all');
+                        },
+                      ),
+                    if (_selectedGenre != 'all')
+                      FilterChip(
+                        label: Text(_selectedGenre),
+                        backgroundColor: AppColors.primary.withOpacity(0.2),
+                        onSelected: (_) {
+                          _updateFilters(genre: 'all');
+                        },
+                        deleteIcon: const Icon(Icons.close, size: 16),
+                        onDeleted: () {
+                          _updateFilters(genre: 'all');
+                        },
+                      ),
+                    if (_yearRange.start > 1900 || _yearRange.end < DateTime.now().year)
+                      FilterChip(
+                        label: Text('${_yearRange.start.toInt()}-${_yearRange.end.toInt()}'),
+                        backgroundColor: AppColors.primary.withOpacity(0.2),
+                        onSelected: (_) {
+                          _updateFilters(yearRange: RangeValues(1900, DateTime.now().year.toDouble()));
+                        },
+                        deleteIcon: const Icon(Icons.close, size: 16),
+                        onDeleted: () {
+                          _updateFilters(yearRange: RangeValues(1900, DateTime.now().year.toDouble()));
+                        },
+                      ),
+                    if (_minRating > 0.0)
+                      FilterChip(
+                        label: Text('Rating ≥ ${_minRating.toInt()}'),
+                        backgroundColor: AppColors.primary.withOpacity(0.2),
+                        onSelected: (_) {
+                          _updateFilters(minRating: 0.0);
+                        },
+                        deleteIcon: const Icon(Icons.close, size: 16),
+                        onDeleted: () {
+                          _updateFilters(minRating: 0.0);
+                        },
+                      ),
+                  ],
+                ),
+              ),
 
             // Search results or suggestions
             Expanded(
@@ -91,13 +293,13 @@ class _SearchScreenState extends State<SearchScreen> {
                   final hasQuery = searchProvider.query.isNotEmpty;
                   final searchResults = searchProvider.searchResults;
 
-                  if (isLoading) {
+                  if (isLoading && !hasQuery) {
                     return const Center(
                       child: LoadingIndicator(),
                     );
                   }
 
-                  if (hasQuery && searchResults.isEmpty) {
+                  if (hasQuery && searchResults.isEmpty && !isLoading) {
                     return Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -108,9 +310,20 @@ class _SearchScreenState extends State<SearchScreen> {
                             color: AppColors.textSecondary.withOpacity(0.5),
                           ),
                           const SizedBox(height: 16),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                            child: Text(
+                              'No results found for "${searchProvider.query}"',
+                              style: TextStyles.headline6.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
                           Text(
-                            'No results found for "${searchProvider.query}"',
-                            style: TextStyles.headline6.copyWith(
+                            'Try adjusting your filters or search terms',
+                            style: TextStyles.bodyText2.copyWith(
                               color: AppColors.textSecondary,
                             ),
                             textAlign: TextAlign.center,
@@ -121,20 +334,84 @@ class _SearchScreenState extends State<SearchScreen> {
                   }
 
                   if (hasQuery) {
-                    return ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: searchResults.length,
-                      itemBuilder: (context, index) {
-                        final movie = searchResults[index];
-                        return SearchResultItem(
-                          movie: movie,
-                          onTap: () => _navigateToMovieDetails(movie.id),
-                        );
-                      },
+                    return Stack(
+                      children: [
+                        ListView.builder(
+                          padding: const EdgeInsets.only(
+                            left: 16,
+                            right: 16,
+                            top: 8,
+                            // Add bottom padding to prevent overflow
+                            bottom: 80,
+                          ),
+                          itemCount: searchResults.length + (isLoading ? 1 : 0) + (searchProvider.hasMoreResults ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (index == searchResults.length) {
+                              if (isLoading) {
+                                return const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 16.0),
+                                  child: Center(
+                                    child: LoadingIndicator(),
+                                  ),
+                                );
+                              } else if (searchProvider.hasMoreResults) {
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 16.0),
+                                  child: Center(
+                                    child: ElevatedButton(
+                                      onPressed: () {
+                                        searchProvider.loadMoreResults();
+                                      },
+                                      child: const Text('Load More'),
+                                    ),
+                                  ),
+                                );
+                              }
+                            }
+
+                            if (index < searchResults.length) {
+                              final movie = searchResults[index];
+                              return SearchResultItem(
+                                movie: movie,
+                                onTap: () => _navigateToMovieDetails(movie.id),
+                              );
+                            }
+
+                            return null;
+                          },
+                        ),
+
+                        // Loading overlay
+                        if (isLoading && searchResults.isNotEmpty)
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(8.0),
+                              color: AppColors.background.withOpacity(0.8),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                  SizedBox(width: 12),
+                                  Text('Loading more results...'),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
                     );
                   }
 
-                  // Show search suggestions
+                  // Show search suggestions and history
                   return _buildSearchSuggestions();
                 },
               ),
@@ -159,57 +436,144 @@ class _SearchScreenState extends State<SearchScreen> {
       'Romance',
     ];
 
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Trending Searches',
-            style: TextStyles.headline6,
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: suggestions.map((suggestion) {
-              return InkWell(
-                onTap: () {
-                  _searchController.text = suggestion;
-                  _searchFocusNode.unfocus();
-                  Provider.of<SearchProvider>(context, listen: false)
-                      .searchMovies(suggestion);
-                },
-                borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (_searchHistory.isNotEmpty) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Recent Searches',
+                    style: TextStyles.headline6,
                   ),
-                  decoration: BoxDecoration(
-                    color: AppColors.cardBackground,
+                  TextButton(
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Clear Search History'),
+                          content: const Text('Are you sure you want to clear your search history?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                _clearSearchHistory();
+                              },
+                              child: const Text('Clear'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    child: Text(
+                      'Clear',
+                      style: TextStyle(
+                        color: AppColors.error,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _searchHistory.map((query) {
+                  return InkWell(
+                    onTap: () {
+                      _searchController.text = query;
+                      _performSearch(query);
+                      _searchFocusNode.unfocus();
+                    },
                     borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.trending_up,
-                        size: 16,
-                        color: AppColors.primary,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        suggestion,
-                        style: TextStyles.bodyText2,
+                      decoration: BoxDecoration(
+                        color: AppColors.cardBackground,
+                        borderRadius: BorderRadius.circular(20),
                       ),
-                    ],
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.history,
+                            size: 16,
+                            color: AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            query,
+                            style: TextStyles.bodyText2,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 16),
+            ],
+
+            Text(
+              'Trending Searches',
+              style: TextStyles.headline6,
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: suggestions.map((suggestion) {
+                return InkWell(
+                  onTap: () {
+                    _searchController.text = suggestion;
+                    _performSearch(suggestion);
+                    _searchFocusNode.unfocus();
+                  },
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.cardBackground,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.trending_up,
+                          size: 16,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          suggestion,
+                          style: TextStyles.bodyText2,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            }).toList(),
-          ),
-        ],
+                );
+              }).toList(),
+            ),
+          ],
+        ),
       ),
     );
   }

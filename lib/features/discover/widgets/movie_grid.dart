@@ -1,8 +1,10 @@
+// lib/features/discover/widgets/movie_grid.dart
 import 'package:flutter/material.dart';
 import '../../../models/movie_model.dart';
 import 'movie_card.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../../../core/widgets/error_widget.dart' as app_error;
+import '../../../core/theme/text_styles.dart';
 
 class MovieGrid extends StatelessWidget {
   final List<MovieModel> movies;
@@ -11,6 +13,7 @@ class MovieGrid extends StatelessWidget {
   final Function(MovieModel) onMovieTap;
   final VoidCallback? onRetry;
   final VoidCallback? onLoadMore;
+  final String emptyMessage;
 
   const MovieGrid({
     Key? key,
@@ -20,6 +23,7 @@ class MovieGrid extends StatelessWidget {
     required this.onMovieTap,
     this.onRetry,
     this.onLoadMore,
+    this.emptyMessage = 'No content found',
   }) : super(key: key);
 
   @override
@@ -38,8 +42,13 @@ class MovieGrid extends StatelessWidget {
     }
 
     if (movies.isEmpty) {
-      return const Center(
-        child: Text('No movies found'),
+      return Center(
+        child: Text(
+          emptyMessage,
+          style: TextStyles.headline6.copyWith(
+            color: Colors.grey,
+          ),
+        ),
       );
     }
 
@@ -52,10 +61,16 @@ class MovieGrid extends StatelessWidget {
         return true;
       },
       child: GridView.builder(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 16,
+          // Add bottom padding to prevent overflow with navigation bar
+          bottom: 80,
+        ),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
-          childAspectRatio: 0.6,
+          childAspectRatio: 0.58, // to fix the overflow reduced the aspec ratio from 0.6 to 0.55
           crossAxisSpacing: 16,
           mainAxisSpacing: 16,
         ),

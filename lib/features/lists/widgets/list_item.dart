@@ -79,7 +79,13 @@ class ListItem extends StatelessWidget {
               ),
             ],
           ),
+          // Constrain the height to prevent overflow
+          constraints: BoxConstraints(
+            minHeight: 120,
+            maxHeight: 150,
+          ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Poster
               ClipRRect(

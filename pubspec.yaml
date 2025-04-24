@@ -60,6 +60,20 @@ dependencies:
   # SVG
   flutter_svg: ^2.0.10+1
 
+  # new dependencies
+  photo_view: ^0.14.0
+  flutter_inappwebview: ^6.0.0
+  youtube_player_flutter: ^9.0.4
+  # this was the replaced depend youtube_player_flutter: ^8.1.2
+
+  # in case this didn't work
+  #flutter_inappwebview: ^6.0.0
+  # replace it with this -> flutter_inappwebview: ^5.8.0
+  # or othis -> flutter_inappwebview: ^5.7.2+3
+
+  #flutter pub add flutter_inappwebview:^6.0.0
+  #flutter pub add youtube_player_flutter:^9.0.4
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

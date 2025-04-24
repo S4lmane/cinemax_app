@@ -1,3 +1,4 @@
+// lib/features/movie_details/providers/movie_details_provider.dart
 import 'package:flutter/material.dart';
 import '../../../core/services/movie_service.dart';
 import '../../../models/movie_model.dart';
@@ -18,27 +19,27 @@ class MovieDetailsProvider extends ChangeNotifier {
   bool get isInWatchlist => _isInWatchlist;
   bool get isInFavorites => _isInFavorites;
 
-  // Get movie details
-  Future<void> getMovieDetails(String movieId) async {
+  // Get movie or TV show details
+  Future<void> getMovieDetails(String itemId, {bool isMovie = true}) async {
     _setLoading(true);
     _clearError();
 
     try {
-      final movie = await _movieService.getMovieDetails(movieId);
+      final movie = await _movieService.getMovieDetails(itemId, isMovie: isMovie);
       _movie = movie;
 
       if (movie == null) {
-        _setError('Failed to load movie details');
+        _setError('Failed to load details');
       } else {
-        // Check if movie is in watchlist
-        _isInWatchlist = await _movieService.isInWatchlist(movieId);
+        // Check if item is in watchlist
+        _isInWatchlist = await _movieService.isInWatchlist(itemId);
 
-        // Check if movie is in favorites
-        _isInFavorites = await _movieService.isInFavorites(movieId);
+        // Check if item is in favorites
+        _isInFavorites = await _movieService.isInFavorites(itemId);
       }
     } catch (e) {
-      _setError('Failed to load movie details: $e');
-      print('Error getting movie details: $e');
+      _setError('Failed to load details: $e');
+      print('Error getting details: $e');
     } finally {
       _setLoading(false);
     }

@@ -1,3 +1,4 @@
+// lib/features/profile/screens/profile_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -10,7 +11,11 @@ import '../../auth/providers/auth_provider.dart';
 import '../widgets/profile_header.dart';
 import '../widgets/user_stats.dart';
 import '../widgets/user_lists.dart';
+import '../widgets/user_watchlist.dart';
+import '../widgets/user_favorites.dart';
 import 'edit_profile_screen.dart';
+import '../../movie_details/providers/movie_details_provider.dart';
+import '../../movie_details/screens/movie_details_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String? userId;
@@ -44,8 +49,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     final String uid = widget.userId ?? FirebaseAuth.instance.currentUser?.uid ?? '';
 
     if (uid.isNotEmpty) {
-      profileProvider.getUserProfile(uid);
-      profileProvider.getUserLists(uid);
+      profileProvider.initializeUserProfile();
     }
   }
 
@@ -67,10 +71,49 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     });
   }
 
+  void _navigateToMovieDetails(String movieId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChangeNotifierProvider(
+          create: (_) => MovieDetailsProvider(),
+          child: MovieDetailsScreen(movieId: movieId),
+        ),
+      ),
+    );
+  }
+
   void _signOut() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sign Out'),
+        content: const Text('Are you sure you want to sign out?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _performSignOut();
+            },
+            child: Text(
+              'Sign Out',
+              style: TextStyle(color: AppColors.error),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _performSignOut() {
     try {
       // Try using Firebase Auth directly instead of the provider
       FirebaseAuth.instance.signOut().then((_) {
+        // Navigate back to the root after signing out
         Navigator.of(context).popUntil((route) => route.isFirst);
       });
     } catch (e) {
@@ -119,8 +162,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
           // Get stats
           final listsCount = profileProvider.userLists.length;
-          final watchlistCount = 0; // Will be implemented later
-          final favoritesCount = 0; // Will be implemented later
+          final watchlistCount = profileProvider.watchlistItems.length;
+          final favoritesCount = profileProvider.favoriteItems.length;
 
           return NestedScrollView(
             headerSliverBuilder: (context, innerBoxIsScrolled) {
@@ -138,6 +181,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                       IconButton(
                         icon: const Icon(Icons.edit),
                         onPressed: _navigateToEditProfile,
+                        tooltip: 'Edit Profile',
                       ),
                     PopupMenuButton<String>(
                       onSelected: (value) {
@@ -209,25 +253,35 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 ),
               ];
             },
-            body: TabBarView(
-              controller: _tabController,
-              children: [
-                // Lists Tab
-                UserLists(
-                  lists: profileProvider.userLists,
-                  isCurrentUser: isCurrentUser,
-                ),
+            body: SafeArea(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  // Lists Tab
+                  UserLists(
+                    lists: profileProvider.userLists,
+                    isCurrentUser: isCurrentUser,
+                  ),
 
-                // Watchlist Tab
-                const Center(
-                  child: Text('Watchlist coming soon'),
-                ),
+                  // Watchlist Tab - Implement the new watchlist widget
+                  UserWatchlist(
+                    movies: profileProvider.watchlistItems,
+                    isCurrentUser: isCurrentUser,
+                    isLoading: profileProvider.isLoadingWatchlist,
+                    onMovieTap: _navigateToMovieDetails,
+                    onRefresh: () => profileProvider.refreshWatchlist(),
+                  ),
 
-                // Favorites Tab
-                const Center(
-                  child: Text('Favorites coming soon'),
-                ),
-              ],
+                  // Favorites Tab - Implement the new favorites widget
+                  UserFavorites(
+                    movies: profileProvider.favoriteItems,
+                    isCurrentUser: isCurrentUser,
+                    isLoading: profileProvider.isLoadingFavorites,
+                    onMovieTap: _navigateToMovieDetails,
+                    onRefresh: () => profileProvider.refreshFavorites(),
+                  ),
+                ],
+              ),
             ),
           );
         },

@@ -6,16 +6,18 @@ import '../../../core/widgets/custom_image.dart';
 
 class MovieHeader extends StatelessWidget {
   final MovieModel movie;
+  final VoidCallback onPosterTap;
 
   const MovieHeader({
     Key? key,
     required this.movie,
+    required this.onPosterTap,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return SliverAppBar(
-      expandedHeight: 300,
+      expandedHeight: 350,
       pinned: true,
       stretch: true,
       backgroundColor: AppColors.background,
@@ -51,25 +53,54 @@ class MovieHeader extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  // Movie poster
-                  Container(
-                    width: 100,
-                    height: 150,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.5),
-                          blurRadius: 10,
-                          offset: const Offset(0, 5),
+                  // Movie poster with tap for fullscreen
+                  GestureDetector(
+                    onTap: onPosterTap,
+                    child: Hero(
+                      tag: 'poster_${movie.id}',
+                      child: Container(
+                        width: 100,
+                        height: 150,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.5),
+                              blurRadius: 10,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: CustomImage(
-                        imageUrl: movie.getPosterUrl(size: 'w200'),
-                        fit: BoxFit.cover,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Stack(
+                            children: [
+                              CustomImage(
+                                imageUrl: movie.getPosterUrl(size: 'w200'),
+                                fit: BoxFit.cover,
+                                height: 150,
+                                width: 100,
+                              ),
+                              // Zoom indicator
+                              Positioned(
+                                right: 4,
+                                bottom: 4,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.6),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Icon(
+                                    Icons.zoom_in,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -82,6 +113,30 @@ class MovieHeader extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        // Content type badge (Movie/TV Show)
+                        // the bloc comment is to remove the item type from the header (Movie or Tv)
+                        /*
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: movie.isMovie ? Colors.blue : Colors.purple,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            movie.isMovie ? 'Movie' : 'TV Show',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ), */
+
+                        const SizedBox(height: 8),
+
                         Text(
                           movie.title,
                           style: TextStyles.headline4.copyWith(
@@ -131,6 +186,7 @@ class MovieHeader extends StatelessWidget {
                         const SizedBox(height: 8),
 
                         // Rating
+                        /* // start rating bloc
                         Row(
                           children: [
                             Container(
@@ -170,6 +226,7 @@ class MovieHeader extends StatelessWidget {
                             ),
                           ],
                         ),
+                        */ // end rating bloc
                       ],
                     ),
                   ),

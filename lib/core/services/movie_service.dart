@@ -1,8 +1,12 @@
+// lib/core/services/movie_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/movie_model.dart';
+import '../../models/cast_model.dart';
+import '../../models/crew_model.dart';
+import '../../models/video_model.dart';
 import '../constants/api_constants.dart';
 
 class MovieService {
@@ -11,6 +15,8 @@ class MovieService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // TMDB API methods
+
+  // Get now playing movies
   Future<List<MovieModel>> getNowPlayingMovies({int page = 1}) async {
     try {
       final response = await _client.get(
@@ -23,7 +29,14 @@ class MovieService {
         final Map<String, dynamic> data = json.decode(response.body);
         final List<dynamic> results = data['results'];
 
-        return results.map((json) => MovieModel.fromMap(json)).toList();
+        final movies = results.map((json) => MovieModel.fromMap(json)).toList();
+
+        // Set isMovie flag
+        for (var movie in movies) {
+          movie.isMovie = true;
+        }
+
+        return movies;
       } else {
         throw Exception('Failed to load now playing movies');
       }
@@ -33,6 +46,37 @@ class MovieService {
     }
   }
 
+  // Get airing today TV shows (equivalent to now playing movies)
+  Future<List<MovieModel>> getAiringTodayTVShows({int page = 1}) async {
+    try {
+      final response = await _client.get(
+        Uri.parse(
+          '${ApiConstants.airingTodayTVShows}?api_key=${ApiConstants.apiKey}&language=en-US&page=$page',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        final List<dynamic> results = data['results'];
+
+        final tvShows = results.map((json) => MovieModel.fromMap(json)).toList();
+
+        // Set isMovie flag
+        for (var tvShow in tvShows) {
+          tvShow.isMovie = false;
+        }
+
+        return tvShows;
+      } else {
+        throw Exception('Failed to load airing today TV shows');
+      }
+    } catch (e) {
+      print('Error fetching airing today TV shows: $e');
+      return [];
+    }
+  }
+
+  // Get popular movies
   Future<List<MovieModel>> getPopularMovies({int page = 1}) async {
     try {
       final response = await _client.get(
@@ -45,7 +89,14 @@ class MovieService {
         final Map<String, dynamic> data = json.decode(response.body);
         final List<dynamic> results = data['results'];
 
-        return results.map((json) => MovieModel.fromMap(json)).toList();
+        final movies = results.map((json) => MovieModel.fromMap(json)).toList();
+
+        // Set isMovie flag
+        for (var movie in movies) {
+          movie.isMovie = true;
+        }
+
+        return movies;
       } else {
         throw Exception('Failed to load popular movies');
       }
@@ -55,6 +106,37 @@ class MovieService {
     }
   }
 
+  // Get popular TV shows
+  Future<List<MovieModel>> getPopularTVShows({int page = 1}) async {
+    try {
+      final response = await _client.get(
+        Uri.parse(
+          '${ApiConstants.popularTVShows}?api_key=${ApiConstants.apiKey}&language=en-US&page=$page',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        final List<dynamic> results = data['results'];
+
+        final tvShows = results.map((json) => MovieModel.fromMap(json)).toList();
+
+        // Set isMovie flag
+        for (var tvShow in tvShows) {
+          tvShow.isMovie = false;
+        }
+
+        return tvShows;
+      } else {
+        throw Exception('Failed to load popular TV shows');
+      }
+    } catch (e) {
+      print('Error fetching popular TV shows: $e');
+      return [];
+    }
+  }
+
+  // Get upcoming movies
   Future<List<MovieModel>> getUpcomingMovies({int page = 1}) async {
     try {
       final response = await _client.get(
@@ -67,7 +149,14 @@ class MovieService {
         final Map<String, dynamic> data = json.decode(response.body);
         final List<dynamic> results = data['results'];
 
-        return results.map((json) => MovieModel.fromMap(json)).toList();
+        final movies = results.map((json) => MovieModel.fromMap(json)).toList();
+
+        // Set isMovie flag
+        for (var movie in movies) {
+          movie.isMovie = true;
+        }
+
+        return movies;
       } else {
         throw Exception('Failed to load upcoming movies');
       }
@@ -77,33 +166,12 @@ class MovieService {
     }
   }
 
-  Future<MovieModel?> getMovieDetails(String movieId) async {
+  // Get upcoming TV shows (equivalent to upcoming movies)
+  Future<List<MovieModel>> getUpcomingTVShows({int page = 1}) async {
     try {
       final response = await _client.get(
         Uri.parse(
-          '${ApiConstants.baseUrl}/movie/$movieId?api_key=${ApiConstants.apiKey}&language=en-US&append_to_response=credits,videos,similar',
-        ),
-      );
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
-        return MovieModel.fromMap(data);
-      } else {
-        throw Exception('Failed to load movie details');
-      }
-    } catch (e) {
-      print('Error fetching movie details: $e');
-      return null;
-    }
-  }
-
-  Future<List<MovieModel>> searchMovies(String query, {int page = 1}) async {
-    if (query.isEmpty) return [];
-
-    try {
-      final response = await _client.get(
-        Uri.parse(
-          '${ApiConstants.searchMovie}?api_key=${ApiConstants.apiKey}&language=en-US&query=$query&page=$page&include_adult=false',
+          '${ApiConstants.onTheAirTVShows}?api_key=${ApiConstants.apiKey}&language=en-US&page=$page',
         ),
       );
 
@@ -111,7 +179,165 @@ class MovieService {
         final Map<String, dynamic> data = json.decode(response.body);
         final List<dynamic> results = data['results'];
 
-        return results.map((json) => MovieModel.fromMap(json)).toList();
+        final tvShows = results.map((json) => MovieModel.fromMap(json)).toList();
+
+        // Set isMovie flag
+        for (var tvShow in tvShows) {
+          tvShow.isMovie = false;
+        }
+
+        return tvShows;
+      } else {
+        throw Exception('Failed to load upcoming TV shows');
+      }
+    } catch (e) {
+      print('Error fetching upcoming TV shows: $e');
+      return [];
+    }
+  }
+
+  // Get movie details
+  Future<MovieModel?> getMovieDetails(String movieId, {bool isMovie = true}) async {
+    try {
+      final String endpoint = isMovie
+          ? '${ApiConstants.baseUrl}/movie/$movieId'
+          : '${ApiConstants.baseUrl}/tv/$movieId';
+
+      final response = await _client.get(
+        Uri.parse(
+          '$endpoint?api_key=${ApiConstants.apiKey}&language=en-US&append_to_response=credits,videos,similar,recommendations',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        final movie = MovieModel.fromMap(data);
+
+        // Set isMovie flag
+        movie.isMovie = isMovie;
+
+        // Parse credits to get cast and crew
+        if (data.containsKey('credits')) {
+          final credits = data['credits'];
+
+          if (credits.containsKey('cast')) {
+            movie.cast = (credits['cast'] as List)
+                .map((castData) => CastModel.fromMap(castData))
+                .toList();
+
+            // Limit to top cast members
+            if (movie.cast.length > 10) {
+              movie.cast = movie.cast.sublist(0, 10);
+            }
+          }
+
+          if (credits.containsKey('crew')) {
+            movie.crew = (credits['crew'] as List)
+                .map((crewData) => CrewModel.fromMap(crewData))
+                .toList();
+
+            // Extract director for movies or creator for TV shows
+            if (isMovie) {
+              movie.director = movie.crew
+                  .firstWhere((crew) => crew.job == 'Director',
+                  orElse: () => CrewModel(
+                    id: '0',
+                    name: 'Unknown',
+                    job: 'Director',
+                    profilePath: '',
+                  ))
+                  .name;
+            } else {
+              if (data.containsKey('created_by') && (data['created_by'] as List).isNotEmpty) {
+                movie.creator = (data['created_by'] as List).first['name'];
+              } else {
+                movie.creator = 'Unknown';
+              }
+            }
+          }
+        }
+
+        // Parse videos to get trailers
+        if (data.containsKey('videos') && data['videos'].containsKey('results')) {
+          movie.videos = (data['videos']['results'] as List)
+              .map((videoData) => VideoModel.fromMap(videoData))
+              .toList();
+
+          // Filter to get only trailers and teasers
+          movie.videos = movie.videos
+              .where((video) =>
+          video.type == 'Trailer' ||
+              video.type == 'Teaser')
+              .toList();
+        }
+
+        // Parse similar movies/shows
+        if (data.containsKey('similar') && data['similar'].containsKey('results')) {
+          movie.similar = (data['similar']['results'] as List)
+              .map((similarData) => MovieModel.fromMap(similarData))
+              .toList();
+
+          // Limit to 10 similar items
+          if (movie.similar.length > 10) {
+            movie.similar = movie.similar.sublist(0, 10);
+          }
+
+          // Set isMovie flag for similar items
+          for (var item in movie.similar) {
+            item.isMovie = isMovie;
+          }
+        }
+
+        // Parse recommendations
+        if (data.containsKey('recommendations') && data['recommendations'].containsKey('results')) {
+          movie.recommendations = (data['recommendations']['results'] as List)
+              .map((recData) => MovieModel.fromMap(recData))
+              .toList();
+
+          // Limit to 10 recommendations
+          if (movie.recommendations.length > 10) {
+            movie.recommendations = movie.recommendations.sublist(0, 10);
+          }
+
+          // Set isMovie flag for recommendations
+          for (var item in movie.recommendations) {
+            item.isMovie = isMovie;
+          }
+        }
+
+        return movie;
+      } else {
+        throw Exception('Failed to load item details');
+      }
+    } catch (e) {
+      print('Error fetching item details: $e');
+      return null;
+    }
+  }
+
+  // Search movies
+  Future<List<MovieModel>> searchMovies(String query, {int page = 1, bool includeAdult = false}) async {
+    if (query.isEmpty) return [];
+
+    try {
+      final response = await _client.get(
+        Uri.parse(
+          '${ApiConstants.searchMovie}?api_key=${ApiConstants.apiKey}&language=en-US&query=$query&page=$page&include_adult=$includeAdult',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        final List<dynamic> results = data['results'];
+
+        final movies = results.map((json) => MovieModel.fromMap(json)).toList();
+
+        // Set isMovie flag
+        for (var movie in movies) {
+          movie.isMovie = true;
+        }
+
+        return movies;
       } else {
         throw Exception('Failed to search movies');
       }
@@ -121,8 +347,100 @@ class MovieService {
     }
   }
 
+  // Search TV shows
+  Future<List<MovieModel>> searchTVShows(String query, {int page = 1}) async {
+    if (query.isEmpty) return [];
+
+    try {
+      final response = await _client.get(
+        Uri.parse(
+          '${ApiConstants.searchTV}?api_key=${ApiConstants.apiKey}&language=en-US&query=$query&page=$page',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        final List<dynamic> results = data['results'];
+
+        final tvShows = results.map((json) => MovieModel.fromMap(json)).toList();
+
+        // Set isMovie flag
+        for (var tvShow in tvShows) {
+          tvShow.isMovie = false;
+        }
+
+        return tvShows;
+      } else {
+        throw Exception('Failed to search TV shows');
+      }
+    } catch (e) {
+      print('Error searching TV shows: $e');
+      return [];
+    }
+  }
+
+  // Get movies by genre
+  Future<List<MovieModel>> getMoviesByGenre(int genreId, {int page = 1}) async {
+    try {
+      final response = await _client.get(
+        Uri.parse(
+          '${ApiConstants.discoverMovie}?api_key=${ApiConstants.apiKey}&language=en-US&with_genres=$genreId&page=$page',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        final List<dynamic> results = data['results'];
+
+        final movies = results.map((json) => MovieModel.fromMap(json)).toList();
+
+        // Set isMovie flag
+        for (var movie in movies) {
+          movie.isMovie = true;
+        }
+
+        return movies;
+      } else {
+        throw Exception('Failed to load movies by genre');
+      }
+    } catch (e) {
+      print('Error fetching movies by genre: $e');
+      return [];
+    }
+  }
+
+  // Get TV shows by genre
+  Future<List<MovieModel>> getTVShowsByGenre(int genreId, {int page = 1}) async {
+    try {
+      final response = await _client.get(
+        Uri.parse(
+          '${ApiConstants.discoverTV}?api_key=${ApiConstants.apiKey}&language=en-US&with_genres=$genreId&page=$page',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        final List<dynamic> results = data['results'];
+
+        final tvShows = results.map((json) => MovieModel.fromMap(json)).toList();
+
+        // Set isMovie flag
+        for (var tvShow in tvShows) {
+          tvShow.isMovie = false;
+        }
+
+        return tvShows;
+      } else {
+        throw Exception('Failed to load TV shows by genre');
+      }
+    } catch (e) {
+      print('Error fetching TV shows by genre: $e');
+      return [];
+    }
+  }
+
   // Watchlist methods
-  Future<bool> addToWatchlist(String movieId, bool isMovie) async {
+  Future<bool> addToWatchlist(String itemId, bool isMovie) async {
     try {
       final User? currentUser = _auth.currentUser;
       if (currentUser == null) {
@@ -130,7 +448,7 @@ class MovieService {
       }
 
       final watchlistItem = {
-        'itemId': movieId,
+        'itemId': itemId,
         'isMovie': isMovie,
         'addedAt': FieldValue.serverTimestamp(),
       };
@@ -148,7 +466,7 @@ class MovieService {
     }
   }
 
-  Future<bool> removeFromWatchlist(String movieId) async {
+  Future<bool> removeFromWatchlist(String itemId) async {
     try {
       final User? currentUser = _auth.currentUser;
       if (currentUser == null) {
@@ -159,7 +477,7 @@ class MovieService {
           .collection('users')
           .doc(currentUser.uid)
           .collection('watchlist')
-          .where('itemId', isEqualTo: movieId)
+          .where('itemId', isEqualTo: itemId)
           .get();
 
       if (querySnapshot.docs.isEmpty) {
@@ -178,7 +496,7 @@ class MovieService {
     }
   }
 
-  Future<bool> isInWatchlist(String movieId) async {
+  Future<bool> isInWatchlist(String itemId) async {
     try {
       final User? currentUser = _auth.currentUser;
       if (currentUser == null) {
@@ -189,7 +507,7 @@ class MovieService {
           .collection('users')
           .doc(currentUser.uid)
           .collection('watchlist')
-          .where('itemId', isEqualTo: movieId)
+          .where('itemId', isEqualTo: itemId)
           .limit(1)
           .get();
 
@@ -214,7 +532,7 @@ class MovieService {
           .get();
 
       return querySnapshot.docs
-          .map((doc) => (doc.data() as Map<String, dynamic>)['itemId'] as String)
+          .map((doc) => (doc.data()['itemId'] as String))
           .toList();
     } catch (e) {
       print('Error getting watchlist IDs: $e');
@@ -222,8 +540,56 @@ class MovieService {
     }
   }
 
+  // Get watchlist items (both movies and TV shows)
+  Future<List<MovieModel>> getWatchlistMovies() async {
+    try {
+      final User? currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        return [];
+      }
+
+      final querySnapshot = await _firestore
+          .collection('users')
+          .doc(currentUser.uid)
+          .collection('watchlist')
+          .orderBy('addedAt', descending: true)
+          .get();
+
+      if (querySnapshot.docs.isEmpty) {
+        return [];
+      }
+
+      List<MovieModel> watchlistItems = [];
+
+      // Process items in batches to improve performance
+      const batchSize = 5;
+      for (int i = 0; i < querySnapshot.docs.length; i += batchSize) {
+        final endIdx = i + batchSize < querySnapshot.docs.length
+            ? i + batchSize : querySnapshot.docs.length;
+
+        final batch = querySnapshot.docs.sublist(i, endIdx);
+        final futures = batch.map((doc) async {
+          final data = doc.data();
+          final itemId = data['itemId'] as String;
+          final isMovie = data['isMovie'] as bool;
+
+          final item = await getMovieDetails(itemId, isMovie: isMovie);
+          return item;
+        }).toList();
+
+        final results = await Future.wait(futures);
+        watchlistItems.addAll(results.whereType<MovieModel>());
+      }
+
+      return watchlistItems;
+    } catch (e) {
+      print('Error getting watchlist items: $e');
+      return [];
+    }
+  }
+
   // Favorites methods
-  Future<bool> addToFavorites(String movieId, bool isMovie) async {
+  Future<bool> addToFavorites(String itemId, bool isMovie) async {
     try {
       final User? currentUser = _auth.currentUser;
       if (currentUser == null) {
@@ -231,7 +597,7 @@ class MovieService {
       }
 
       final favoriteItem = {
-        'itemId': movieId,
+        'itemId': itemId,
         'isMovie': isMovie,
         'addedAt': FieldValue.serverTimestamp(),
       };
@@ -249,7 +615,7 @@ class MovieService {
     }
   }
 
-  Future<bool> removeFromFavorites(String movieId) async {
+  Future<bool> removeFromFavorites(String itemId) async {
     try {
       final User? currentUser = _auth.currentUser;
       if (currentUser == null) {
@@ -260,7 +626,7 @@ class MovieService {
           .collection('users')
           .doc(currentUser.uid)
           .collection('favorites')
-          .where('itemId', isEqualTo: movieId)
+          .where('itemId', isEqualTo: itemId)
           .get();
 
       if (querySnapshot.docs.isEmpty) {
@@ -279,7 +645,7 @@ class MovieService {
     }
   }
 
-  Future<bool> isInFavorites(String movieId) async {
+  Future<bool> isInFavorites(String itemId) async {
     try {
       final User? currentUser = _auth.currentUser;
       if (currentUser == null) {
@@ -290,7 +656,7 @@ class MovieService {
           .collection('users')
           .doc(currentUser.uid)
           .collection('favorites')
-          .where('itemId', isEqualTo: movieId)
+          .where('itemId', isEqualTo: itemId)
           .limit(1)
           .get();
 
@@ -298,6 +664,54 @@ class MovieService {
     } catch (e) {
       print('Error checking favorites: $e');
       return false;
+    }
+  }
+
+  // Get favorite items (both movies and TV shows)
+  Future<List<MovieModel>> getFavoriteMovies() async {
+    try {
+      final User? currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        return [];
+      }
+
+      final querySnapshot = await _firestore
+          .collection('users')
+          .doc(currentUser.uid)
+          .collection('favorites')
+          .orderBy('addedAt', descending: true)
+          .get();
+
+      if (querySnapshot.docs.isEmpty) {
+        return [];
+      }
+
+      List<MovieModel> favoriteItems = [];
+
+      // Process items in batches to improve performance
+      const batchSize = 5;
+      for (int i = 0; i < querySnapshot.docs.length; i += batchSize) {
+        final endIdx = i + batchSize < querySnapshot.docs.length
+            ? i + batchSize : querySnapshot.docs.length;
+
+        final batch = querySnapshot.docs.sublist(i, endIdx);
+        final futures = batch.map((doc) async {
+          final data = doc.data();
+          final itemId = data['itemId'] as String;
+          final isMovie = data['isMovie'] as bool;
+
+          final item = await getMovieDetails(itemId, isMovie: isMovie);
+          return item;
+        }).toList();
+
+        final results = await Future.wait(futures);
+        favoriteItems.addAll(results.whereType<MovieModel>());
+      }
+
+      return favoriteItems;
+    } catch (e) {
+      print('Error getting favorite items: $e');
+      return [];
     }
   }
 
@@ -382,69 +796,6 @@ class MovieService {
     } catch (e) {
       print('Error removing from list: $e');
       return false;
-    }
-  }
-
-  // Get movies from watchlist
-  Future<List<MovieModel>> getWatchlistMovies() async {
-    try {
-      final watchlistIds = await getWatchlistIds();
-      if (watchlistIds.isEmpty) return [];
-
-      List<MovieModel> watchlistMovies = [];
-
-      // Due to API limitations, we need to fetch each movie individually
-      for (var id in watchlistIds) {
-        final movie = await getMovieDetails(id);
-        if (movie != null) {
-          watchlistMovies.add(movie);
-        }
-      }
-
-      return watchlistMovies;
-    } catch (e) {
-      print('Error getting watchlist movies: $e');
-      return [];
-    }
-  }
-
-  // Get favorite movies
-  Future<List<MovieModel>> getFavoriteMovies() async {
-    try {
-      final User? currentUser = _auth.currentUser;
-      if (currentUser == null) {
-        return [];
-      }
-
-      final querySnapshot = await _firestore
-          .collection('users')
-          .doc(currentUser.uid)
-          .collection('favorites')
-          .orderBy('addedAt', descending: true)
-          .get();
-
-      if (querySnapshot.docs.isEmpty) {
-        return [];
-      }
-
-      final favoriteIds = querySnapshot.docs
-          .map((doc) => (doc.data()['itemId'] as String))
-          .toList();
-
-      List<MovieModel> favoriteMovies = [];
-
-      // Due to API limitations, we need to fetch each movie individually
-      for (var id in favoriteIds) {
-        final movie = await getMovieDetails(id);
-        if (movie != null) {
-          favoriteMovies.add(movie);
-        }
-      }
-
-      return favoriteMovies;
-    } catch (e) {
-      print('Error getting favorite movies: $e');
-      return [];
     }
   }
 }

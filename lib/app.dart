@@ -66,16 +66,23 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Get safe area padding to avoid bottom overflow
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+
     return Scaffold(
       body: _screens[_selectedIndex],
       extendBody: true,
-      bottomNavigationBar: CustomBottomNavBar(
-        currentIndex: _selectedIndex,
-        onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
+      bottomNavigationBar: Padding(
+        // Add padding to avoid overflow with system UI
+        padding: EdgeInsets.only(bottom: bottomPadding > 0 ? 0 : 8),
+        child: CustomBottomNavBar(
+          currentIndex: _selectedIndex,
+          onTap: (index) {
+            setState(() {
+              _selectedIndex = index;
+            });
+          },
+        ),
       ),
     );
   }

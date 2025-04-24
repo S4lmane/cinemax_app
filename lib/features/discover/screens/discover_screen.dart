@@ -1,12 +1,14 @@
+// lib/features/discover/screens/discover_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/text_styles.dart';
+import '../../../models/movie_model.dart';
 import '../../movie_details/providers/movie_details_provider.dart';
-import '../widgets/category_tabs.dart';
+import '../widgets/content_tabs.dart';
 import '../widgets/movie_grid.dart';
 import '../../auth/providers/auth_provider.dart';
-import '../providers/movies_provider.dart';
+import '../providers/discover_provider.dart';
 import '../../movie_details/screens/movie_details_screen.dart';
 import '../../profile/providers/profile_provider.dart';
 import '../../profile/screens/profile_screen.dart';
@@ -18,27 +20,36 @@ class DiscoverScreen extends StatefulWidget {
   State<DiscoverScreen> createState() => _DiscoverScreenState();
 }
 
-class _DiscoverScreenState extends State<DiscoverScreen> with SingleTickerProviderStateMixin {
+class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStateMixin {
+  // class _DiscoverScreenState extends State<DiscoverScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  late TabController _contentTypeController;
   final List<String> _tabs = ['New', 'Popular', 'Upcoming'];
+  final List<String> _contentTypes = ['Movies', 'TV Shows'];
   int _currentPage = 1;
+  String _currentContentType = 'Movies';
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
+    _contentTypeController = TabController(length: _contentTypes.length, vsync: this);
+
     _tabController.addListener(_handleTabChange);
+    _contentTypeController.addListener(_handleContentTypeChange);
 
     // Load initial data
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadMovies();
+      _loadContent();
     });
   }
 
   @override
   void dispose() {
     _tabController.removeListener(_handleTabChange);
+    _contentTypeController.removeListener(_handleContentTypeChange);
     _tabController.dispose();
+    _contentTypeController.dispose();
     super.dispose();
   }
 
@@ -47,40 +58,66 @@ class _DiscoverScreenState extends State<DiscoverScreen> with SingleTickerProvid
       setState(() {
         _currentPage = 1;
       });
-      _loadMovies();
+      _loadContent();
     }
   }
 
-  void _loadMovies() {
-    final moviesProvider = Provider.of<MoviesProvider>(context, listen: false);
+  void _handleContentTypeChange() {
+    if (_contentTypeController.indexIsChanging) {
+      setState(() {
+        _currentPage = 1;
+        _currentContentType = _contentTypes[_contentTypeController.index];
+      });
+      _loadContent();
+    }
+  }
+
+  void _loadContent() {
+    final discoverProvider = Provider.of<DiscoverProvider>(context, listen: false);
+    final isMovies = _currentContentType == 'Movies';
 
     switch (_tabController.index) {
-      case 0:
-        moviesProvider.fetchNewMovies(page: _currentPage, resetIfFirstPage: true);
+      case 0: // New
+        if (isMovies) {
+          discoverProvider.fetchNewMovies(page: _currentPage, resetIfFirstPage: true);
+        } else {
+          discoverProvider.fetchNewTVShows(page: _currentPage, resetIfFirstPage: true);
+        }
         break;
-      case 1:
-        moviesProvider.fetchPopularMovies(page: _currentPage, resetIfFirstPage: true);
+      case 1: // Popular
+        if (isMovies) {
+          discoverProvider.fetchPopularMovies(page: _currentPage, resetIfFirstPage: true);
+        } else {
+          discoverProvider.fetchPopularTVShows(page: _currentPage, resetIfFirstPage: true);
+        }
         break;
-      case 2:
-        moviesProvider.fetchUpcomingMovies(page: _currentPage, resetIfFirstPage: true);
+      case 2: // Upcoming
+        if (isMovies) {
+          discoverProvider.fetchUpcomingMovies(page: _currentPage, resetIfFirstPage: true);
+        } else {
+          discoverProvider.fetchUpcomingTVShows(page: _currentPage, resetIfFirstPage: true);
+        }
         break;
     }
   }
 
-  void _loadMoreMovies() {
+  void _loadMoreContent() {
     setState(() {
       _currentPage++;
     });
-    _loadMovies();
+    _loadContent();
   }
 
-  void _navigateToMovieDetails(BuildContext context, String movieId) {
+  void _navigateToDetails(BuildContext context, MovieModel movie) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ChangeNotifierProvider(
           create: (_) => MovieDetailsProvider(),
-          child: MovieDetailsScreen(movieId: movieId),
+          child: MovieDetailsScreen(
+            movieId: movie.id,
+            isMovie: movie.isMovie,
+          ),
         ),
       ),
     );
@@ -176,10 +213,46 @@ class _DiscoverScreenState extends State<DiscoverScreen> with SingleTickerProvid
               ),
             ),
 
-            // Tab bar
+            // Content type toggle (Movies/TV Shows)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: CategoryTabs(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColors.cardBackground,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: TabBar(
+                  controller: _contentTypeController,
+                  indicatorPadding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  indicator: BoxDecoration(
+                    color: Colors.transparent,
+                    border: Border(
+                      bottom: BorderSide(
+                        color: AppColors.primary,
+                        width: 3,
+                      ),
+                    ),
+                  ),
+                  labelColor: AppColors.primary,
+                  unselectedLabelColor: AppColors.textSecondary,
+                  labelStyle: TextStyles.headline6.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                  unselectedLabelStyle: TextStyles.headline6.copyWith(
+                    fontWeight: FontWeight.w400,
+                  ),
+                  tabs: _contentTypes.map((type) => Tab(text: type)).toList(),
+                ),
+              ),
+            ),
+
+            // Category tab bar (New/Popular/Upcoming)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: ContentTabs(
                 tabs: _tabs,
                 controller: _tabController,
               ),
@@ -187,43 +260,42 @@ class _DiscoverScreenState extends State<DiscoverScreen> with SingleTickerProvid
 
             // Tab content
             Expanded(
-              child: Consumer<MoviesProvider>(
-                builder: (context, moviesProvider, _) {
-                  // Determine which movies to display based on current tab
-                  final isLoading = moviesProvider.isLoading;
-                  final error = moviesProvider.error;
+              child: Consumer<DiscoverProvider>(
+                builder: (context, discoverProvider, _) {
+                  // Determine which content to display based on current tab and content type
+                  final isLoading = discoverProvider.isLoading;
+                  final error = discoverProvider.error;
+
+                  List<MovieModel> content = [];
+                  bool isMovies = _currentContentType == 'Movies';
 
                   switch (_tabController.index) {
                     case 0: // New
-                      return MovieGrid(
-                        movies: moviesProvider.newMovies,
-                        isLoading: isLoading,
-                        errorMessage: error,
-                        onMovieTap: (movie) => _navigateToMovieDetails(context, movie.id),
-                        onRetry: _loadMovies,
-                        onLoadMore: _loadMoreMovies,
-                      );
+                      content = isMovies
+                          ? discoverProvider.newMovies
+                          : discoverProvider.newTVShows;
+                      break;
                     case 1: // Popular
-                      return MovieGrid(
-                        movies: moviesProvider.popularMovies,
-                        isLoading: isLoading,
-                        errorMessage: error,
-                        onMovieTap: (movie) => _navigateToMovieDetails(context, movie.id),
-                        onRetry: _loadMovies,
-                        onLoadMore: _loadMoreMovies,
-                      );
+                      content = isMovies
+                          ? discoverProvider.popularMovies
+                          : discoverProvider.popularTVShows;
+                      break;
                     case 2: // Upcoming
-                      return MovieGrid(
-                        movies: moviesProvider.upcomingMovies,
-                        isLoading: isLoading,
-                        errorMessage: error,
-                        onMovieTap: (movie) => _navigateToMovieDetails(context, movie.id),
-                        onRetry: _loadMovies,
-                        onLoadMore: _loadMoreMovies,
-                      );
-                    default:
-                      return const SizedBox.shrink();
+                      content = isMovies
+                          ? discoverProvider.upcomingMovies
+                          : discoverProvider.upcomingTVShows;
+                      break;
                   }
+
+                  return MovieGrid(
+                    movies: content,
+                    isLoading: isLoading,
+                    errorMessage: error,
+                    onMovieTap: (movie) => _navigateToDetails(context, movie),
+                    onRetry: _loadContent,
+                    onLoadMore: _loadMoreContent,
+                    emptyMessage: 'No ${isMovies ? 'movies' : 'TV shows'} found',
+                  );
                 },
               ),
             ),
