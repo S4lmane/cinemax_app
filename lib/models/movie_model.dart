@@ -41,11 +41,11 @@ class MovieModel {
     required this.isMovie,
     this.numberOfSeasons,
     this.numberOfEpisodes,
-    this.cast = const [],
-    this.crew = const [],
-    this.videos = const [],
-    this.similar = const [],
-    this.recommendations = const [],
+    this.cast = const [], // Default empty list
+    this.crew = const [], // Default empty list
+    this.videos = const [], // Default empty list
+    this.similar = const [], // Default empty list
+    this.recommendations = const [], // Default empty list
     this.director,
     this.creator,
     this.status = 'Unknown',

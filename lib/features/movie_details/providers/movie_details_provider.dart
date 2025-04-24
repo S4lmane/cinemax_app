@@ -1,4 +1,3 @@
-// lib/features/movie_details/providers/movie_details_provider.dart
 import 'package:flutter/material.dart';
 import '../../../core/services/movie_service.dart';
 import '../../../models/movie_model.dart';
@@ -30,41 +29,17 @@ class MovieDetailsProvider extends ChangeNotifier {
       if (movie == null) {
         _setError('Failed to load details');
       } else {
-        _movie = movie; // Only set movie if it's not null
-
-        // Ensure the isMovie flag is set correctly
+        _movie = movie;
         _movie!.isMovie = isMovie;
-
-        // Check if item is in watchlist
         _isInWatchlist = await _movieService.isInWatchlist(itemId);
-
-        // Check if item is in favorites
         _isInFavorites = await _movieService.isInFavorites(itemId);
+        notifyListeners();
       }
     } catch (e) {
       _setError('Failed to load details: $e');
       print('Error getting details: $e');
     } finally {
       _setLoading(false);
-    }
-  }
-
-  Future<void> _loadSimilarAndRecommended(String itemId, bool isMovie) async {
-    try {
-      if (_movie == null) return;
-
-      // Get improved similar movies
-      final similar = await _movieService.getImprovedSimilarMovies(itemId, isMovie);
-      _movie!.similar = similar;
-
-      // Get improved recommendations
-      final recommendations = await _movieService.getYouMightAlsoLike(itemId, isMovie);
-      _movie!.recommendations = recommendations;
-
-      // Notify listeners of updated data
-      notifyListeners();
-    } catch (e) {
-      print('Error loading similar and recommended: $e');
     }
   }
 
@@ -89,10 +64,13 @@ class MovieDetailsProvider extends ChangeNotifier {
       }
 
       _setLoading(false);
+      notifyListeners();
       return success;
     } catch (e) {
       _setError('Failed to update watchlist: $e');
       print('Error toggling watchlist: $e');
+      _setLoading(false);
+      notifyListeners();
       return false;
     }
   }
@@ -105,7 +83,7 @@ class MovieDetailsProvider extends ChangeNotifier {
 
     try {
       final movieId = _movie!.id;
-      bool success = false; // Initialize with a default value
+      bool success;
 
       if (_isInFavorites) {
         success = await _movieService.removeFromFavorites(movieId);
@@ -118,10 +96,13 @@ class MovieDetailsProvider extends ChangeNotifier {
       }
 
       _setLoading(false);
+      notifyListeners();
       return success;
     } catch (e) {
       _setError('Failed to update favorites: $e');
       print('Error toggling favorites: $e');
+      _setLoading(false);
+      notifyListeners();
       return false;
     }
   }
@@ -143,7 +124,6 @@ class MovieDetailsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Clear movie data
   void clearMovie() {
     _movie = null;
     _isInWatchlist = false;
