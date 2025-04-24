@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -11,6 +12,7 @@ import '../../../core/constants/app_constants.dart';
 class ListProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
   final StorageService _storageService = StorageService();
   final MovieService _movieService = MovieService();
 
@@ -48,7 +50,7 @@ class ListProvider extends ChangeNotifier {
       final userId = currentUser.uid;
       final now = DateTime.now();
 
-      // Create list document
+      // Create list document first
       final listData = {
         'userId': userId,
         'name': name,
@@ -63,36 +65,46 @@ class ListProvider extends ChangeNotifier {
         'itemCount': 0,
       };
 
-      // Add to Firestore
-      final listRef = await _firestore
+      // Add to Firestore first to get the listId
+      final docRef = await _firestore
           .collection(AppConstants.usersCollection)
           .doc(userId)
           .collection(AppConstants.listsCollection)
           .add(listData);
 
-      // If cover image is provided, upload it
+      final listId = docRef.id;
+      print('List created with ID: $listId');
+
+      // If cover image is provided, upload it with the proper list ID
       if (coverImage != null) {
-        final imageUrl = await _storageService.uploadListCoverImage(
-          userId,
-          listRef.id,
-          coverImage,
-        );
+        try {
+          // Use the StorageService instead for simplicity
+          final imageUrl = await _storageService.uploadListCoverImage(
+            userId,
+            listId,
+            coverImage,
+          );
 
-        // Update list with cover image URL
-        await listRef.update({
-          'coverImageUrl': imageUrl,
-        });
+          // Update list with cover image URL
+          await docRef.update({
+            'coverImageUrl': imageUrl,
+          });
 
-        listData['coverImageUrl'] = imageUrl;
+          listData['coverImageUrl'] = imageUrl;
+        } catch (e) {
+          print('Error uploading cover image: $e');
+          // Continue even if image upload fails
+        }
       }
 
       // Create list model and set as current list
-      _currentList = ListModel.fromMap(listData, listRef.id);
+      _currentList = ListModel.fromMap(listData, listId);
 
       _setLoading(false);
-      return listRef.id;
+      return listId;
     } catch (e) {
       _setError('Failed to create list: $e');
+      print('Error creating list: $e');
       return null;
     }
   }
@@ -211,14 +223,14 @@ class ListProvider extends ChangeNotifier {
         return false;
       }
 
-      // Check content type allowed
+      // Check content type allowed - more detailed error message
       if (isMovie && !_currentList!.allowMovies) {
-        _setError('Movies are not allowed in this list');
+        _setError('This list is for TV shows only. Movies are not allowed.');
         return false;
       }
 
       if (!isMovie && !_currentList!.allowTvShows) {
-        _setError('TV shows are not allowed in this list');
+        _setError('This list is for movies only. TV shows are not allowed.');
         return false;
       }
 
@@ -243,10 +255,10 @@ class ListProvider extends ChangeNotifier {
         updatedAt: DateTime.now(),
       );
 
-      // Get the movie details and add to list items
-      final movie = await _movieService.getMovieDetails(itemId);
-      if (movie != null) {
-        _listItems.add(movie);
+      // Get the movie/TV show details and add to list items
+      final item = await _movieService.getMovieDetails(itemId, isMovie: isMovie);
+      if (item != null) {
+        _listItems.add(item);
       }
 
       _setLoading(false);

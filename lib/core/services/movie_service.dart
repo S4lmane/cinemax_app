@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/movie_model.dart';
 import '../../models/cast_model.dart';
 import '../../models/crew_model.dart';
+import '../../models/season_model.dart';
 import '../../models/video_model.dart';
 import '../constants/api_constants.dart';
 
@@ -13,6 +14,7 @@ class MovieService {
   final http.Client _client = http.Client();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  http.Client get client => _client;
 
   // TMDB API methods
 
@@ -753,6 +755,339 @@ class MovieService {
     } catch (e) {
       print('Error adding to list: $e');
       return false;
+    }
+  }
+
+  // new fetching method
+  Future<List<MovieModel>> getImprovedSimilarMovies(String movieId, bool isMovie) async {
+    try {
+      // First, get the movie details to understand its genres, cast, etc.
+      final movie = await getMovieDetails(movieId, isMovie: isMovie);
+
+      if (movie == null) {
+        return [];
+      }
+
+      // Get base similar movies from API
+      final String endpoint = isMovie
+          ? '${ApiConstants.baseUrl}/movie/$movieId/similar'
+          : '${ApiConstants.baseUrl}/tv/$movieId/similar';
+
+      final response = await _client.get(
+        Uri.parse(
+          '$endpoint?api_key=${ApiConstants.apiKey}&language=en-US&page=1',
+        ),
+      );
+
+      if (response.statusCode != 200) {
+        return [];
+      }
+
+      final Map<String, dynamic> data = json.decode(response.body);
+      List<MovieModel> similarMovies = (data['results'] as List)
+          .map((json) => MovieModel.fromMap(json))
+          .toList();
+
+      // Set isMovie flag
+      for (var item in similarMovies) {
+        item.isMovie = isMovie;
+      }
+
+      // Add sequels/prequels for movies (if they exist)
+      if (isMovie && movie.title.isNotEmpty) {
+        final sequels = await _searchForSequels(movie.title);
+
+        // Add sequels/prequels that aren't already in the similar list
+        final existingIds = similarMovies.map((m) => m.id).toSet();
+        for (var sequel in sequels) {
+          if (!existingIds.contains(sequel.id) && sequel.id != movieId) {
+            similarMovies.add(sequel);
+          }
+        }
+      }
+
+      // Prioritize:
+      // 1. Movies with same director/creator
+      // 2. Movies with common cast members
+      // 3. Movies in the same genre with high ratings
+
+      // Sort by relevance
+      similarMovies.sort((a, b) {
+        // Calculate relevance score
+        int scoreA = _calculateRelevanceScore(a, movie);
+        int scoreB = _calculateRelevanceScore(b, movie);
+
+        // Sort by score (descending)
+        return scoreB.compareTo(scoreA);
+      });
+
+      // Limit to top 10 most relevant
+      if (similarMovies.length > 10) {
+        similarMovies = similarMovies.sublist(0, 10);
+      }
+
+      return similarMovies;
+    } catch (e) {
+      print('Error getting improved similar movies: $e');
+      return [];
+    }
+  }
+
+// Helper method to search for sequels/prequels
+  Future<List<MovieModel>> _searchForSequels(String title) async {
+    // Extract base movie name (remove numbers and common sequel indicators)
+    final baseTitle = title.replaceAll(RegExp(r'\s*\d+\s*$'), '')
+        .replaceAll(RegExp(r'\s*:\s*.*$'), '')
+        .trim();
+
+    if (baseTitle.length < 3) {
+      return [];
+    }
+
+    // Search for movies with similar title
+    final response = await _client.get(
+      Uri.parse(
+        '${ApiConstants.searchMovie}?api_key=${ApiConstants.apiKey}&language=en-US&query=$baseTitle&page=1',
+      ),
+    );
+
+    if (response.statusCode != 200) {
+      return [];
+    }
+
+    final Map<String, dynamic> data = json.decode(response.body);
+    List<MovieModel> results = (data['results'] as List)
+        .map((json) => MovieModel.fromMap(json))
+        .toList();
+
+    // Filter results to find likely sequels/prequels
+    return results.where((movie) {
+      // Check if title starts with the base title
+      if (!movie.title.toLowerCase().startsWith(baseTitle.toLowerCase())) {
+        return false;
+      }
+
+      // Check for sequel/prequel indicators
+      final sequelPattern = RegExp(
+        r'\s+(part\s+\d+|chapter\s+\d+|\d+|ii|iii|iv|v|vi|vii|viii|ix|x)$',
+        caseSensitive: false,
+      );
+
+      return sequelPattern.hasMatch(movie.title.toLowerCase()) ||
+          movie.title.toLowerCase().contains(':');
+    }).toList();
+  }
+
+// Helper method to calculate relevance score for similar movies
+  int _calculateRelevanceScore(MovieModel movie, MovieModel referenceMovie) {
+    int score = 0;
+
+    // Check for same director/creator
+    if (movie.director == referenceMovie.director ||
+        movie.creator == referenceMovie.creator) {
+      score += 50;
+    }
+
+    // Check for common cast members
+    final referenceCastIds = referenceMovie.cast.map((c) => c.id).toSet();
+    for (var castMember in movie.cast) {
+      if (referenceCastIds.contains(castMember.id)) {
+        score += 10;
+      }
+    }
+
+    // Check for matching genres
+    final referenceGenres = referenceMovie.genres.toSet();
+    for (var genre in movie.genres) {
+      if (referenceGenres.contains(genre)) {
+        score += 5;
+      }
+    }
+
+    // Bonus for high ratings
+    if (movie.voteAverage >= 7.5) {
+      score += 15;
+    } else if (movie.voteAverage >= 6.5) {
+      score += 10;
+    } else if (movie.voteAverage >= 5.0) {
+      score += 5;
+    }
+
+    return score;
+  }
+
+// Add this method to get better "You Might Also Like" recommendations
+  Future<List<MovieModel>> getYouMightAlsoLike(String movieId, bool isMovie) async {
+    try {
+      // First get the movie details
+      final movie = await getMovieDetails(movieId, isMovie: isMovie);
+
+      if (movie == null) {
+        return [];
+      }
+
+      // Get base recommendations from API
+      final String endpoint = isMovie
+          ? '${ApiConstants.baseUrl}/movie/$movieId/recommendations'
+          : '${ApiConstants.baseUrl}/tv/$movieId/recommendations';
+
+      final response = await _client.get(
+        Uri.parse(
+          '$endpoint?api_key=${ApiConstants.apiKey}&language=en-US&page=1',
+        ),
+      );
+
+      if (response.statusCode != 200) {
+        return [];
+      }
+
+      final Map<String, dynamic> data = json.decode(response.body);
+      List<MovieModel> recommendations = (data['results'] as List)
+          .map((json) => MovieModel.fromMap(json))
+          .toList();
+
+      // Set isMovie flag
+      for (var item in recommendations) {
+        item.isMovie = isMovie;
+      }
+
+      // If we don't have enough recommendations, supplement with popular items in same genre
+      if (recommendations.length < 8 && movie.genres.isNotEmpty) {
+        final mainGenre = movie.genres.first;
+
+        // Find matching genre ID
+        int? genreId;
+        for (var entry in ApiConstants.genres.entries) {
+          if (entry.value.toLowerCase() == mainGenre.toLowerCase()) {
+            genreId = entry.key;
+            break;
+          }
+        }
+
+        if (genreId != null) {
+          // Get popular items in this genre
+          final genreItems = isMovie
+              ? await getMoviesByGenre(genreId, page: 1)
+              : await getTVShowsByGenre(genreId, page: 1);
+
+          // Add non-duplicate items from genre search
+          final existingIds = recommendations.map((m) => m.id).toSet();
+          for (var item in genreItems) {
+            if (!existingIds.contains(item.id) && item.id != movieId) {
+              recommendations.add(item);
+              if (recommendations.length >= 10) break;
+            }
+          }
+        }
+      }
+
+      // Sort by popularity and rating
+      recommendations.sort((a, b) {
+        // First by vote average (high to low)
+        final ratingCompare = b.voteAverage.compareTo(a.voteAverage);
+        if (ratingCompare != 0) return ratingCompare;
+
+        // Then by vote count (high to low) as a proxy for popularity
+        return b.voteCount.compareTo(a.voteCount);
+      });
+
+      // Limit to top 10
+      if (recommendations.length > 10) {
+        recommendations = recommendations.sublist(0, 10);
+      }
+
+      return recommendations;
+    } catch (e) {
+      print('Error getting you might also like: $e');
+      return [];
+    }
+  }
+  // new fetching method
+
+  Future<List<MovieModel>> getNowPlayingMoviesInRange({
+    required String startDate,
+    required String endDate,
+    int page = 1
+  }) async {
+    try {
+      final response = await _client.get(
+        Uri.parse(
+          '${ApiConstants.nowPlayingMovies}?api_key=${ApiConstants.apiKey}&language=en-US&page=$page&primary_release_date.gte=$startDate&primary_release_date.lte=$endDate',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        final List<dynamic> results = data['results'];
+
+        final movies = results.map((json) => MovieModel.fromMap(json)).toList();
+
+        // Set isMovie flag
+        for (var movie in movies) {
+          movie.isMovie = true;
+        }
+
+        return movies;
+      } else {
+        throw Exception('Failed to load now playing movies');
+      }
+    } catch (e) {
+      print('Error fetching now playing movies in range: $e');
+      return [];
+    }
+  }
+
+  Future<List<MovieModel>> getUpcomingMoviesWithReleaseDate({int page = 1}) async {
+    try {
+      // Get current date
+      final now = DateTime.now();
+      final nowFormatted = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+
+      final response = await _client.get(
+        Uri.parse(
+          '${ApiConstants.upcomingMovies}?api_key=${ApiConstants.apiKey}&language=en-US&page=$page&primary_release_date.gte=$nowFormatted',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        final List<dynamic> results = data['results'];
+
+        final movies = results.map((json) => MovieModel.fromMap(json)).toList();
+
+        // Set isMovie flag
+        for (var movie in movies) {
+          movie.isMovie = true;
+        }
+
+        return movies;
+      } else {
+        throw Exception('Failed to load upcoming movies');
+      }
+    } catch (e) {
+      print('Error fetching upcoming movies with release date: $e');
+      return [];
+    }
+  }
+
+  Future<SeasonModel?> getSeasonDetails(String tvId, int seasonNumber) async {
+    try {
+      final endpoint = '${ApiConstants.baseUrl}/tv/$tvId/season/$seasonNumber';
+      final response = await _client.get(
+        Uri.parse(
+          '$endpoint?api_key=${ApiConstants.apiKey}&language=en-US',
+        ),
+      );
+
+      if (response.statusCode != 200) {
+        return null;
+      }
+
+      final Map<String, dynamic> data = json.decode(response.body);
+      return SeasonModel.fromMap(data);
+    } catch (e) {
+      print('Error getting season details: $e');
+      return null;
     }
   }
 

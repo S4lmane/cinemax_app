@@ -88,7 +88,7 @@ class ProfileHeader extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                '@${user.username}',
+                '@${user.username}',  // Make sure to include the @ symbol
                 style: TextStyles.bodyText2.copyWith(
                   color: AppColors.textSecondary,
                 ),

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/movie_model.dart';
 import '../../../core/widgets/loading_indicator.dart';
+import '../../../shared/utils/preferences_helper.dart';
 import '../../lists/widgets/list_item.dart';
+import '../providers/profile_provider.dart';
 
 class UserWatchlist extends StatelessWidget {
   final List<MovieModel> movies;
@@ -106,29 +109,73 @@ class UserWatchlist extends StatelessWidget {
     );
   }
 
-  void _removeFromWatchlist(BuildContext context, MovieModel movie) {
+  void _removeFromWatchlist(BuildContext context, MovieModel movie) async {
+    // Check if we should skip confirmation
+    bool skipConfirm = await PreferencesHelper.getBoolPref(
+        PreferencesHelper.skipWatchlistConfirmKey);
+
+    if (skipConfirm) {
+      // Remove directly without confirmation
+      await Provider.of<ProfileProvider>(context, listen: false)
+          .removeFromWatchlist(movie.id);
+      onRefresh();
+      return;
+    }
+
+    // Otherwise show dialog with checkbox
+    bool neverAskAgain = false;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove from Watchlist'),
-        content: Text('Are you sure you want to remove "${movie.title}" from your watchlist?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Remove from Watchlist'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Are you sure you want to remove "${movie.title}" from your watchlist?'),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Checkbox(
+                    value: neverAskAgain,
+                    onChanged: (value) {
+                      setState(() {
+                        neverAskAgain = value ?? false;
+                      });
+                    },
+                  ),
+                  const Text('Don\'t ask again'),
+                ],
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Implement the removal logic through the provider
-              onRefresh();
-            },
-            child: const Text(
-              'Remove',
-              style: TextStyle(color: Colors.red),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
             ),
-          ),
-        ],
+            TextButton(
+              onPressed: () async {
+                // Save preference if checked
+                if (neverAskAgain) {
+                  await PreferencesHelper.saveBoolPref(
+                      PreferencesHelper.skipWatchlistConfirmKey, true);
+                }
+
+                Navigator.pop(context);
+                await Provider.of<ProfileProvider>(context, listen: false)
+                    .removeFromWatchlist(movie.id);
+                onRefresh();
+              },
+              child: const Text(
+                'Remove',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

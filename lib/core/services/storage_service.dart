@@ -16,24 +16,27 @@ class StorageService {
       final fileExtension = path.extension(imageFile.path);
       final fileName = '${userId}_${_uuid.v4()}$fileExtension';
 
-      // Create storage reference
+      // Create storage reference with more specific path
       final storageRef = _storage.ref()
-          .child(AppConstants.profileImagesPath)
-          .child(userId)
-          .child(fileName);
+          .child('users')  // Main folder
+          .child(userId)   // User subfolder
+          .child('profile')  // Profile folder
+          .child(fileName);  // Filename
 
-      // Upload file
-      final uploadTask = storageRef.putFile(
-        imageFile,
-        SettableMetadata(contentType: 'image/${fileExtension.substring(1)}'),
+      // Ensure metadata is set correctly
+      final metadata = SettableMetadata(
+        contentType: 'image/${fileExtension.substring(1)}',
       );
 
+      // Upload file
+      final uploadTask = storageRef.putFile(imageFile, metadata);
+
       // Get download URL
-      final snapshot = await uploadTask;
+      final snapshot = await uploadTask.whenComplete(() => null);
       return await snapshot.ref.getDownloadURL();
     } catch (e) {
       debugPrint('Error uploading profile image: $e');
-      rethrow;
+      throw e;  // Re-throw to handle in the UI
     }
   }
 

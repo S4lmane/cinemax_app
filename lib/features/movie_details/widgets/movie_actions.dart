@@ -138,94 +138,107 @@ class _MovieActionsState extends State<MovieActions> {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        // Watchlist button
-        _buildActionColumn(
-          icon: _watchlistLoading
-              ? const SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: AppColors.primary,
-            ),
-          )
-              : Icon(
-            widget.isInWatchlist
-                ? Icons.bookmark
-                : Icons.bookmark_border,
-            color: widget.isInWatchlist
-                ? AppColors.primary
-                : AppColors.textPrimary,
-            size: 24,
-          ),
-          label: 'Watchlist',
-          onTap: _toggleWatchlist,
-        ),
-
-        // Favorite button
-        _buildActionColumn(
-          icon: _favoriteLoading
-              ? const SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: AppColors.primary,
-            ),
-          )
-              : Icon(
-            widget.isInFavorites ? Icons.favorite : Icons.favorite_border,
-            color: widget.isInFavorites
-                ? Colors.red
-                : AppColors.textPrimary,
-            size: 24,
-          ),
-          label: 'Favorite',
-          onTap: _toggleFavorite,
-        ),
-
-        // Lists button
-        _buildActionColumn(
-          icon: const Icon(
-            Icons.playlist_add,
-            color: AppColors.textPrimary,
-            size: 24,
-          ),
-          label: 'Lists',
-          onTap: () {
-            showModalBottomSheet(
-              context: context,
-              shape: const RoundedRectangleBorder(
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(20),
+    return Container(
+      width: double.infinity,  // Make container full width
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,  // Evenly space buttons
+        children: [
+          // Watchlist button
+          Expanded(  // Make button expand
+            child: _buildActionColumn(
+              icon: _watchlistLoading
+                  ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.primary,
                 ),
+              )
+                  : Icon(
+                widget.isInWatchlist
+                    ? Icons.bookmark
+                    : Icons.bookmark_border,
+                color: widget.isInWatchlist
+                    ? AppColors.primary
+                    : AppColors.textPrimary,
+                size: 24,
               ),
-              backgroundColor: AppColors.cardBackground,
-              builder: (context) => Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: AddToListButton(
-                  movieId: widget.movie.id,
-                  isMovie: widget.movie.isMovie,
-                ),
-              ),
-            );
-          },
-        ),
-
-        // Share button
-        _buildActionColumn(
-          icon: const Icon(
-            Icons.share,
-            color: AppColors.textPrimary,
-            size: 24,
+              label: 'Watchlist',
+              onTap: _toggleWatchlist,
+            ),
           ),
-          label: 'Share',
-          onTap: _shareMovie,
-        ),
-      ],
+
+          // Favorite button
+          Expanded(  // Make button expand
+            child: _buildActionColumn(
+              icon: _favoriteLoading
+                  ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.primary,
+                ),
+              )
+                  : Icon(
+                widget.isInFavorites ? Icons.favorite : Icons.favorite_border,
+                color: widget.isInFavorites
+                    ? Colors.red
+                    : AppColors.textPrimary,
+                size: 24,
+              ),
+              label: 'Favorite',
+              onTap: _toggleFavorite,
+            ),
+          ),
+
+          // Lists button
+          Expanded(  // Make button expand
+            child: _buildActionColumn(
+              icon: const Icon(
+                Icons.playlist_add,
+                color: AppColors.textPrimary,
+                size: 24,
+              ),
+              label: 'Lists',
+              onTap: () {
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
+                  ),
+                  backgroundColor: AppColors.cardBackground,
+                  builder: (context) => Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: AddToListButton(
+                      movieId: widget.movie.id,
+                      isMovie: widget.movie.isMovie,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // Share button
+          Expanded(  // Make button expand
+            child: _buildActionColumn(
+              icon: const Icon(
+                Icons.share,
+                color: AppColors.textPrimary,
+                size: 24,
+              ),
+              label: 'Share',
+              onTap: _shareMovie,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

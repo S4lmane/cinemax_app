@@ -60,10 +60,14 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   }
 
   void _navigateToEditProfile() {
+    final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const EditProfileScreen(),
+        builder: (context) => ChangeNotifierProvider.value(
+          value: profileProvider, // Use the same provider instance
+          child: const EditProfileScreen(),
+        ),
       ),
     ).then((_) {
       // Refresh profile after editing

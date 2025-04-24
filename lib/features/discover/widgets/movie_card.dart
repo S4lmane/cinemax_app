@@ -96,50 +96,34 @@ class MovieCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                // Add content type indicator
+                Positioned(
+                  bottom: 8,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: movie.isMovie
+                          ? Colors.blue.withOpacity(0.8)
+                          : Colors.purple.withOpacity(0.8),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      movie.isMovie ? 'Movie' : 'TV',
+                      style: TextStyles.caption.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
-
-            // Movie Details
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    movie.title,
-                    style: TextStyles.bodyText1.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  /* // bloc the year and the genres
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Text(
-                        movie.getYear(),
-                        style: TextStyles.caption.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          movie.getGenreString(),
-                          style: TextStyles.caption.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  */
-                ],
-              ),
-            ),
+            // Removed title section as requested
           ],
         ),
       ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/text_styles.dart';
+import '../../../core/utils/notification_service.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/auth_button.dart';
 import '../widgets/auth_field.dart';
@@ -33,8 +34,11 @@ class _LoginScreenState extends State<LoginScreen> {
         _isLoading = true;
       });
 
-      final success = await context.read<AuthProvider>().signIn(
-        _emailController.text.trim(),
+      final emailOrUsername = _emailController.text.trim();
+
+      // Use the new sign in method that supports both email and username
+      final success = await context.read<AuthProvider>().signInWithUsernameOrEmail(
+        emailOrUsername,
         _passwordController.text,
       );
 
@@ -47,11 +51,9 @@ class _LoginScreenState extends State<LoginScreen> {
         // Show error snackbar
         if (mounted) {
           final error = context.read<AuthProvider>().error;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(error ?? 'Login failed. Please try again.'),
-              backgroundColor: AppColors.error,
-            ),
+          NotificationService.showError(
+            context,
+            error ?? 'Login failed. Please try again.',
           );
         }
       }
@@ -62,6 +64,78 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
     }
+  }
+
+  void _forgotPassword() {
+    final TextEditingController resetEmailController = TextEditingController();
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Reset Password'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Enter your email address to receive a password reset link:'),
+              const SizedBox(height: 16),
+              TextField(
+                controller: resetEmailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  hintText: 'Enter your email',
+                  prefixIcon: Icon(Icons.email_outlined),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: isSubmitting ? null : () async {
+                final email = resetEmailController.text.trim();
+                if (email.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please enter your email')),
+                  );
+                  return;
+                }
+
+                setState(() {
+                  isSubmitting = true;
+                });
+
+                final success = await context.read<AuthProvider>().resetPassword(email);
+
+                if (mounted) {
+                  Navigator.pop(context);
+                  if (success) {
+                    NotificationService.showSuccess(
+                      context,
+                      'Password reset link sent to your email',
+                    );
+                  } else {
+                    final error = context.read<AuthProvider>().error;
+                    NotificationService.showError(
+                      context,
+                      error ?? 'Failed to send reset link',
+                    );
+                  }
+                }
+              },
+              child: isSubmitting
+                  ? const CircularProgressIndicator(strokeWidth: 2)
+                  : const Text('Send Reset Link'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -134,18 +208,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
                       // Form fields
                       AuthField(
-                        label: 'Email',
-                        hintText: 'Enter your email',
+                        label: 'Email or Username',
+                        hintText: 'Enter your email or username',
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
-                        prefixIcon: Icons.email_outlined,
+                        prefixIcon: Icons.person_outlined,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please enter your email';
-                          }
-                          if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
-                              .hasMatch(value)) {
-                            return 'Please enter a valid email';
+                            return 'Please enter your email or username';
                           }
                           return null;
                         },
@@ -169,9 +239,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
-                          onPressed: () {
-                            // TODO: Implement forgot password
-                          },
+                          onPressed: _forgotPassword,
                           child: Text(
                             'Forgot Password?',
                             style: TextStyles.bodyText2.copyWith(
@@ -179,7 +247,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                        ),
+                        )
                       ),
                       const SizedBox(height: 32),
 

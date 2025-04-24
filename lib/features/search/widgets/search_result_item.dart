@@ -1,18 +1,44 @@
+// lib/features/search/widgets/search_result_item.dart
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/text_styles.dart';
-import '../../../models/movie_model.dart';
 import '../../../core/widgets/custom_image.dart';
 
 class SearchResultItem extends StatelessWidget {
-  final MovieModel movie;
+  final String title;
+  final String posterPath;
+  final double voteAverage;
+  final bool isMovie;
+  final String overview;
+  final String releaseDate;
   final VoidCallback onTap;
 
   const SearchResultItem({
     Key? key,
-    required this.movie,
+    required this.title,
+    required this.posterPath,
+    required this.voteAverage,
+    required this.isMovie,
+    this.overview = '', // Optional with default value
+    this.releaseDate = '', // Optional with default value
     required this.onTap,
   }) : super(key: key);
+
+  String getYear() {
+    if (releaseDate.isEmpty) return '';
+    try {
+      return releaseDate.substring(0, 4);
+    } catch (e) {
+      return '';
+    }
+  }
+
+  String getPosterUrl({String size = 'w200'}) {
+    if (posterPath.isEmpty) {
+      return 'https://via.placeholder.com/500x750?text=No+Image+Available';
+    }
+    return 'https://image.tmdb.org/t/p/$size$posterPath';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +58,7 @@ class SearchResultItem extends StatelessWidget {
           ],
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Poster
             ClipRRect(
@@ -43,7 +70,7 @@ class SearchResultItem extends StatelessWidget {
                 width: 80,
                 height: 120,
                 child: CustomImage(
-                  imageUrl: movie.getPosterUrl(size: 'w200'),
+                  imageUrl: getPosterUrl(),
                   fit: BoxFit.cover,
                 ),
               ),
@@ -56,44 +83,57 @@ class SearchResultItem extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Title
                     Text(
-                      movie.title,
+                      title,
                       style: TextStyles.headline6,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
+
+                    // Year and content type
                     Row(
                       children: [
                         Text(
-                          movie.getYear(),
+                          getYear(),
                           style: TextStyles.caption.copyWith(
                             color: AppColors.textSecondary,
                           ),
                         ),
-                        if (movie.genres.isNotEmpty) ...[
-                          const SizedBox(width: 8),
-                          Text(
-                            '•',
+                        const SizedBox(width: 8),
+                        Text(
+                          '•',
+                          style: TextStyles.caption.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2
+                          ),
+                          decoration: BoxDecoration(
+                            color: isMovie
+                                ? Colors.blue.withOpacity(0.2)
+                                : Colors.purple.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            isMovie ? 'Movie' : 'TV Show',
                             style: TextStyles.caption.copyWith(
-                              color: AppColors.textSecondary,
+                              color: isMovie ? Colors.blue : Colors.purple,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              movie.getGenreString(),
-                              style: TextStyles.caption.copyWith(
-                                color: AppColors.textSecondary,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
+
+                    // Rating
                     Row(
                       children: [
                         const Icon(
@@ -103,24 +143,18 @@ class SearchResultItem extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          movie.voteAverage.toStringAsFixed(1),
+                          voteAverage.toStringAsFixed(1),
                           style: TextStyles.bodyText2.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '(${movie.voteCount})',
-                          style: TextStyles.caption.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
                       ],
                     ),
-                    if (movie.overview.isNotEmpty) ...[
+
+                    if (overview.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Text(
-                        movie.overview,
+                        overview,
                         style: TextStyles.bodyText2.copyWith(
                           color: AppColors.textSecondary,
                         ),

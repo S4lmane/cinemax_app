@@ -26,11 +26,15 @@ class MovieDetailsProvider extends ChangeNotifier {
 
     try {
       final movie = await _movieService.getMovieDetails(itemId, isMovie: isMovie);
-      _movie = movie;
 
       if (movie == null) {
         _setError('Failed to load details');
       } else {
+        _movie = movie; // Only set movie if it's not null
+
+        // Ensure the isMovie flag is set correctly
+        _movie!.isMovie = isMovie;
+
         // Check if item is in watchlist
         _isInWatchlist = await _movieService.isInWatchlist(itemId);
 
@@ -42,6 +46,25 @@ class MovieDetailsProvider extends ChangeNotifier {
       print('Error getting details: $e');
     } finally {
       _setLoading(false);
+    }
+  }
+
+  Future<void> _loadSimilarAndRecommended(String itemId, bool isMovie) async {
+    try {
+      if (_movie == null) return;
+
+      // Get improved similar movies
+      final similar = await _movieService.getImprovedSimilarMovies(itemId, isMovie);
+      _movie!.similar = similar;
+
+      // Get improved recommendations
+      final recommendations = await _movieService.getYouMightAlsoLike(itemId, isMovie);
+      _movie!.recommendations = recommendations;
+
+      // Notify listeners of updated data
+      notifyListeners();
+    } catch (e) {
+      print('Error loading similar and recommended: $e');
     }
   }
 

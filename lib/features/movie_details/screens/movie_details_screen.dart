@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../../../core/widgets/error_widget.dart' as app_error;
+import '../../../models/movie_model.dart';
 import '../providers/movie_details_provider.dart';
 import '../widgets/movie_header.dart';
 import '../widgets/movie_info.dart';
@@ -78,11 +79,21 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
         final isLoading = movieDetailsProvider.isLoading;
         final error = movieDetailsProvider.error;
 
+        // Loading state
         if (isLoading && movie == null) {
           return Scaffold(
             appBar: AppBar(
               title: const Text('Details'),
               centerTitle: true,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.home),
+                  onPressed: () {
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  },
+                  tooltip: 'Home',
+                ),
+              ],
             ),
             body: const Center(
               child: LoadingIndicator(),
@@ -90,11 +101,21 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
           );
         }
 
+        // Error state
         if (error != null && movie == null) {
           return Scaffold(
             appBar: AppBar(
               title: const Text('Details'),
               centerTitle: true,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.home),
+                  onPressed: () {
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  },
+                  tooltip: 'Home',
+                ),
+              ],
             ),
             body: app_error.ErrorWidget(
               message: error,
@@ -103,11 +124,21 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
           );
         }
 
+        // No data state
         if (movie == null) {
           return Scaffold(
             appBar: AppBar(
               title: const Text('Details'),
               centerTitle: true,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.home),
+                  onPressed: () {
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  },
+                  tooltip: 'Home',
+                ),
+              ],
             ),
             body: const app_error.ErrorWidget(
               message: 'Item not found',
@@ -115,197 +146,147 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
             ),
           );
         }
-
+        // Content state - Only now do we know movie is not null
         return Scaffold(
           body: RefreshIndicator(
             onRefresh: _refreshMovieDetails,
             color: AppColors.primary,
             child: CustomScrollView(
-              slivers: [
-                // Movie header with backdrop and poster
-                MovieHeader(
-                  movie: movie,
-                  onPosterTap: () => _openFullscreenPoster(movie.getPosterUrl()),
-                ),
-
-                // Status badge
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: movie.isMovie ? Colors.blue : Colors.purple,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            movie.isMovie ? 'Movie' : 'TV Show',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                        ////// type
-                        const SizedBox(width: 10),
-                        // const Spacer(), // similar to justify-flex: space-between;
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _getStatusColor(movie.getStatusBadge()),
-                            borderRadius: BorderRadius.circular(5),
-                          ),
-                          child: Text(
-                            movie.getStatusBadge(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        // Item Rating
-                        // blocked the rating // changed were made
-                        /*
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.star,
-                                    color: Colors.white,
-                                    size: 16,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    movie.voteAverage.toStringAsFixed(1),
-                                    style: TextStyles.bodyText2.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-
-                            ),
-                            /*
-                            const SizedBox(width: 8),
-                            Text(
-                              '(${movie.voteCount})',
-                              style: TextStyles.bodyText2.copyWith(
-                                color: Colors.white.withOpacity(0.9),
-                              ),
-                            ),
-                            */
-                          ],
-                        ),
-                        */
-                        ////// type
-                        // Share button
-                        /*
-                        IconButton(
-                          icon: const Icon(Icons.share),
-                          onPressed: () => _shareMovie(
-                            movie.title,
-                            movie.getPosterUrl(),
-                            movie.overview,
-                          ),
-                          tooltip: 'Share',
-                        ), */
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Movie actions (watchlist, favorite, share)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: MovieActions(
-                      isInWatchlist: movieDetailsProvider.isInWatchlist,
-                      isInFavorites: movieDetailsProvider.isInFavorites,
-                      onWatchlistToggle: movieDetailsProvider.toggleWatchlist,
-                      onFavoriteToggle: movieDetailsProvider.toggleFavorites,
-                      movie: movie,
-                    ),
-                  ),
-                ),
-
-                // Movie info
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: MovieInfo(movie: movie),
-                  ),
-                ),
-
-                // Cast section
-                if (movie.cast.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: CastList(cast: movie.cast),
-                    ),
-                  ),
-
-                // Videos section (trailers, etc)
-                if (movie.videos.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: VideoSection(videos: movie.videos),
-                    ),
-                  ),
-
-                // Similar movies
-                if (movie.similar.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: SimilarMovies(
-                        title: 'Similar ${movie.isMovie ? 'Movies' : 'Shows'}',
-                        movies: movie.similar,
-                      ),
-                    ),
-                  ),
-
-                // Recommendations
-                if (movie.recommendations.isNotEmpty)
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 36),
-                      child: SimilarMovies(
-                        title: 'You Might Also Like',
-                        movies: movie.recommendations,
-                      ),
-                    ),
-                  ),
-              ],
+              slivers: _buildSlivers(movie, movieDetailsProvider),
             ),
           ),
         );
       },
     );
+  }
+
+  // Create a separate method to build all slivers
+  List<Widget> _buildSlivers(MovieModel movie, MovieDetailsProvider provider) {
+    List<Widget> slivers = [];
+
+    // Movie header with backdrop and poster
+    slivers.add(MovieHeader(
+      movie: movie,
+      onPosterTap: () => _openFullscreenPoster(movie.getPosterUrl()),
+    ));
+
+    // Status badge
+    slivers.add(SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 6,
+              ),
+              decoration: BoxDecoration(
+                color: movie.isMovie ? Colors.blue : Colors.purple,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                movie.isMovie ? 'Movie' : 'TV Show',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 6,
+              ),
+              decoration: BoxDecoration(
+                color: _getStatusColor(movie.getStatusBadge()),
+                borderRadius: BorderRadius.circular(5),
+              ),
+              child: Text(
+                movie.getStatusBadge(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ));
+
+    // Movie actions (watchlist, favorite, share)
+    slivers.add(SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: MovieActions(
+          isInWatchlist: provider.isInWatchlist,
+          isInFavorites: provider.isInFavorites,
+          onWatchlistToggle: provider.toggleWatchlist,
+          onFavoriteToggle: provider.toggleFavorites,
+          movie: movie,
+        ),
+      ),
+    ));
+
+    // Movie info
+    slivers.add(SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: MovieInfo(movie: movie),
+      ),
+    ));
+
+    // Cast section
+    if (movie.cast.isNotEmpty) {
+      slivers.add(SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: CastList(cast: movie.cast),
+        ),
+      ));
+    }
+
+    // Videos section (trailers, etc)
+    if (movie.videos.isNotEmpty) {
+      slivers.add(SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: VideoSection(videos: movie.videos),
+        ),
+      ));
+    }
+
+    // Similar movies
+    if (movie.similar.isNotEmpty) {
+      slivers.add(SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: SimilarMovies(
+            title: 'Similar ${movie.isMovie ? 'Movies' : 'Shows'}',
+            movies: movie.similar,
+          ),
+        ),
+      ));
+    }
+
+    // Recommendations
+    if (movie.recommendations.isNotEmpty) {
+      slivers.add(SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 36),
+          child: SimilarMovies(
+            title: 'You Might Also Like',
+            movies: movie.recommendations,
+          ),
+        ),
+      ));
+    }
+
+    return slivers;
   }
 
   Color _getStatusColor(String status) {

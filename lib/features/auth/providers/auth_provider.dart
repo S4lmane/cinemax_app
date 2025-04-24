@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../../core/services/auth_service.dart';
@@ -100,6 +101,51 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
 
       await _authService.resetPassword(email);
+
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } on FirebaseAuthException catch (e) {
+      _isLoading = false;
+      _error = _getErrorMessage(e);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> signInWithUsernameOrEmail(String usernameOrEmail, String password) async {
+    try {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+
+      // Determine if input is email or username
+      bool isEmail = usernameOrEmail.contains('@');
+
+      if (isEmail) {
+        // Direct login with email
+        await _authService.signInWithEmailAndPassword(usernameOrEmail, password);
+      } else {
+        // Find email associated with username
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .where('username', isEqualTo: usernameOrEmail)
+            .limit(1)
+            .get();
+
+        if (userDoc.docs.isEmpty) {
+          _isLoading = false;
+          _error = 'No user found with this username';
+          notifyListeners();
+          return false;
+        }
+
+        // Get email from user document
+        final email = userDoc.docs.first.data()['email'] as String;
+
+        // Sign in with retrieved email
+        await _authService.signInWithEmailAndPassword(email, password);
+      }
 
       _isLoading = false;
       notifyListeners();

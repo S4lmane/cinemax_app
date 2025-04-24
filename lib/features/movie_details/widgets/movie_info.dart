@@ -1,7 +1,9 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/movie_model.dart';
+import '../screens/season_details_screen.dart';
 
 class MovieInfo extends StatelessWidget {
   final MovieModel movie;
@@ -66,6 +68,13 @@ class MovieInfo extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 16),
+            if (movie.isMovie && movie.director != null && movie.director!.isNotEmpty) ...[
+              _buildInfoRow('Director', movie.director!),
+              const SizedBox(height: 16),
+            ] else if (!movie.isMovie && movie.creator != null && movie.creator!.isNotEmpty) ...[
+              _buildInfoRow('Creator', movie.creator!),
+              const SizedBox(height: 16),
+            ],
             Text(
               '${movie.voteCount} votes',
               style: TextStyles.bodyText2.copyWith(
@@ -164,6 +173,29 @@ class MovieInfo extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 24),
+        if (!movie.isMovie && movie.numberOfSeasons != null && movie.numberOfSeasons! > 0) ...[
+          Text(
+            'Seasons',
+            style: TextStyles.headline5,
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 200,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: movie.numberOfSeasons,
+              itemBuilder: (context, index) {
+                // Season numbers usually start at 1
+                final seasonNumber = index + 1;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 16),
+                  child: _buildSeasonCard(context, seasonNumber),
+                );
+              },
+            ),
+          ),
+        ],
+        const SizedBox(height: 24),
         const Text(
           'Overview',
           style: TextStyles.headline5,
@@ -214,6 +246,128 @@ class MovieInfo extends StatelessWidget {
         ),
         const SizedBox(height: 16),
       ],
+    );
+  }
+
+  Widget _buildSeasonCard(BuildContext context, int seasonNumber) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SeasonDetailsScreen(
+              tvShowId: movie.id,
+              seasonNumber: seasonNumber,
+              tvShowName: movie.title,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        width: 120,
+        decoration: BoxDecoration(
+          color: AppColors.cardBackground,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 5,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Season poster (use show poster as fallback)
+            AspectRatio(
+              aspectRatio: 2 / 3,
+              child: ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  topRight: Radius.circular(12),
+                ),
+                child: CachedNetworkImage(
+                  imageUrl: movie.getPosterUrl(size: 'w200'),
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    color: AppColors.cardBackground,
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => Container(
+                    color: AppColors.cardBackground,
+                    child: const Icon(
+                      Icons.tv,
+                      color: AppColors.textSecondary,
+                      size: 40,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                children: [
+                  Text(
+                    'Season $seasonNumber',
+                    style: TextStyles.bodyText2.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (seasonNumber == 1) ...[
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'First Season',
+                        style: TextStyles.caption.copyWith(
+                          color: AppColors.primary,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                  ] else if (seasonNumber == movie.numberOfSeasons) ...[
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'Latest',
+                        style: TextStyles.caption.copyWith(
+                          color: Colors.blue,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

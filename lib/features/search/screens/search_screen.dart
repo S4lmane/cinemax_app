@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../core/widgets/loading_indicator.dart';
+import '../../../models/movie_model.dart';
+import '../../../shared/utils/recent_items_service.dart';
 import '../providers/search_provider.dart';
 import '../widgets/search_bar.dart';
 import '../widgets/search_result_item.dart';
@@ -163,16 +165,60 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  void _navigateToMovieDetails(String movieId) {
+  void _navigateToMovieDetails(dynamic item) {
+    // Extract common data regardless of type
+    String movieId;
+    bool isMovie;
+
+    if (item is Map<String, dynamic>) {
+      movieId = item['id'].toString();
+      isMovie = item['media_type'] == 'movie';
+    } else if (item is MovieModel) {
+      movieId = item.id;
+      isMovie = item.isMovie;
+    } else if (item is String) {
+      // Handle case where just an ID is passed
+      movieId = item;
+      isMovie = true; // Default to movie - you might need a better way to determine this
+    } else {
+      print('Unexpected type for movie details navigation: ${item.runtimeType}');
+      return;
+    }
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ChangeNotifierProvider(
           create: (_) => MovieDetailsProvider(),
-          child: MovieDetailsScreen(movieId: movieId),
+          child: MovieDetailsScreen(
+            movieId: movieId,
+            isMovie: isMovie,
+          ),
         ),
       ),
     );
+
+    // Add to recently viewed if we have enough data
+    if (item is MovieModel) {
+      RecentItemsService.addRecentItem(item);
+    } else if (item is Map<String, dynamic> &&
+        (item['title'] != null || item['name'] != null)) {
+      final movie = MovieModel(
+        id: movieId,
+        title: item['title'] ?? item['name'] ?? 'Unknown',
+        posterPath: item['poster_path'] ?? '',
+        backdropPath: item['backdrop_path'] ?? '',
+        overview: item['overview'] ?? '',
+        voteAverage: (item['vote_average'] ?? 0.0).toDouble(),
+        voteCount: item['vote_count'] ?? 0,
+        releaseDate: item['release_date'] ?? item['first_air_date'] ?? '',
+        genres: [],
+        runtime: 0,
+        isMovie: isMovie,
+      );
+
+      RecentItemsService.addRecentItem(movie);
+    }
   }
 
   @override
@@ -370,10 +416,46 @@ class _SearchScreenState extends State<SearchScreen> {
                             }
 
                             if (index < searchResults.length) {
-                              final movie = searchResults[index];
+                              final result = searchResults[index];
+
+                              // Extract needed information based on result type
+                              String id;
+                              String title;
+                              String posterPath;
+                              bool isMovie;
+                              double voteAverage;
+                              String overview = '';
+                              String releaseDate = '';
+
+                              if (result is Map<String, dynamic>) {
+                                id = result['id'].toString();
+                                title = result['title'] ?? result['name'] ?? 'Unknown';
+                                posterPath = result['poster_path'] ?? '';
+                                isMovie = result['media_type'] == 'movie';
+                                voteAverage = (result['vote_average'] ?? 0.0).toDouble();
+                                overview = result['overview'] ?? '';
+                                releaseDate = result['release_date'] ?? result['first_air_date'] ?? '';
+                              } else if (result is MovieModel) {
+                                id = result.id;
+                                title = result.title;
+                                posterPath = result.posterPath;
+                                isMovie = result.isMovie;
+                                voteAverage = result.voteAverage;
+                                overview = result.overview;
+                                releaseDate = result.releaseDate;
+                              } else {
+                                // Handle unexpected type
+                                return const SizedBox.shrink();
+                              }
+
                               return SearchResultItem(
-                                movie: movie,
-                                onTap: () => _navigateToMovieDetails(movie.id),
+                                title: title,
+                                posterPath: posterPath,
+                                voteAverage: voteAverage,
+                                isMovie: isMovie,
+                                overview: overview,
+                                releaseDate: releaseDate,
+                                onTap: () => _navigateToMovieDetails(result),
                               );
                             }
 

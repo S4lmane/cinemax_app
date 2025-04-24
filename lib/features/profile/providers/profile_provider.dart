@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/services/user_service.dart';
 import '../../../core/services/movie_service.dart';
+import '../../../core/utils/notification_service.dart';
 import '../../../models/user_model.dart';
 import '../../../models/list_model.dart';
 import '../../../models/movie_model.dart';
@@ -148,6 +149,7 @@ class ProfileProvider extends ChangeNotifier {
     try {
       final success = await _movieService.removeFromWatchlist(movieId);
       if (success) {
+        // Remove the item from local list
         _watchlistItems.removeWhere((movie) => movie.id == movieId);
         notifyListeners();
       }
@@ -163,6 +165,7 @@ class ProfileProvider extends ChangeNotifier {
     try {
       final success = await _movieService.removeFromFavorites(movieId);
       if (success) {
+        // Remove the item from local list
         _favoriteItems.removeWhere((movie) => movie.id == movieId);
         notifyListeners();
       }

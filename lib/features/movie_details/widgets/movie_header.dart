@@ -21,6 +21,16 @@ class MovieHeader extends StatelessWidget {
       pinned: true,
       stretch: true,
       backgroundColor: AppColors.background,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.home),
+          onPressed: () {
+            // Navigate to the main/home screen
+            Navigator.of(context).popUntil((route) => route.isFirst);
+          },
+          tooltip: 'Home',
+        ),
+      ],
       flexibleSpace: FlexibleSpaceBar(
         background: Stack(
           fit: StackFit.expand,
@@ -184,6 +194,7 @@ class MovieHeader extends StatelessWidget {
                         ),
 
                         const SizedBox(height: 8),
+
 
                         // Rating
                         /* // start rating bloc
