@@ -9,7 +9,6 @@ import '../../../models/cast_model.dart';
 import '../../../models/movie_model.dart';
 import '../../../models/video_model.dart';
 import '../providers/movie_details_provider.dart';
-import '../widgets/movie_header.dart';
 import '../widgets/movie_info.dart';
 import '../widgets/movie_actions.dart';
 import '../widgets/cast_list.dart';
@@ -35,6 +34,7 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
   @override
   void initState() {
     super.initState();
+    // Fetch movie details after the first frame to ensure context is valid
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         Provider.of<MovieDetailsProvider>(context, listen: false)
@@ -45,11 +45,8 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
 
   @override
   void dispose() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        Provider.of<MovieDetailsProvider>(context, listen: false).clearMovie();
-      }
-    });
+    // Clear movie data directly without scheduling
+    Provider.of<MovieDetailsProvider>(context, listen: false).clearMovie();
     super.dispose();
   }
 
@@ -69,6 +66,52 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
     }
   }
 
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'released':
+      case 'ongoing':
+        return Colors.green;
+      case 'in production':
+      case 'coming soon':
+        return Colors.orange;
+      case 'planned':
+        return Colors.blue;
+      case 'ended':
+        return Colors.purple;
+      case 'canceled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status.toLowerCase()) {
+      case 'released':
+      case 'ongoing':
+        return Icons.check_circle;
+      case 'in production':
+        return Icons.build;
+      case 'coming soon':
+        return Icons.schedule;
+      case 'planned':
+        return Icons.event;
+      case 'ended':
+        return Icons.stop_circle;
+      case 'canceled':
+        return Icons.cancel;
+      default:
+        return Icons.info;
+    }
+  }
+
+  Color _getRatingColor(double rating) {
+    if (rating >= 8.0) return Colors.green;
+    if (rating >= 6.0) return Colors.orange;
+    if (rating >= 4.0) return Colors.amber;
+    return Colors.red;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<MovieDetailsProvider>(
@@ -77,7 +120,102 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
         final isLoading = movieDetailsProvider.isLoading;
         final error = movieDetailsProvider.error;
 
-        // Debug logging
+        // Show loading screen if data is being fetched and no movie data is available
+        if (isLoading && movie == null) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('Details'),
+              centerTitle: true,
+              backgroundColor: AppColors.background,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                color: Colors.white,
+                onPressed: () => Navigator.of(context).pop(),
+                tooltip: 'Back',
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.home),
+                  color: Colors.white,
+                  onPressed: () {
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  },
+                  tooltip: 'Home',
+                ),
+              ],
+            ),
+            body: const Center(
+              child: LoadingIndicator(),
+            ),
+          );
+        }
+
+        // Show error screen if there's an error and no movie data
+        if (error != null && movie == null) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('Details'),
+              centerTitle: true,
+              backgroundColor: AppColors.background,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                color: Colors.white,
+                onPressed: () => Navigator.of(context).pop(),
+                tooltip: 'Back',
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.home),
+                  color: Colors.white,
+                  onPressed: () {
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  },
+                  tooltip: 'Home',
+                ),
+              ],
+            ),
+            body: app_error.ErrorWidget(
+              message: error,
+              onRetry: _refreshMovieDetails,
+            ),
+          );
+        }
+
+        // Fallback for null movie
+        if (movie == null) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('Details'),
+              centerTitle: true,
+              backgroundColor: AppColors.background,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                color: Colors.white,
+                onPressed: () => Navigator.of(context).pop(),
+                tooltip: 'Back',
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.home),
+                  color: Colors.white,
+                  onPressed: () {
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  },
+                  tooltip: 'Home',
+                ),
+              ],
+            ),
+            body: const app_error.ErrorWidget(
+              message: 'Item not found',
+              icon: Icons.movie_filter,
+            ),
+          );
+        }
+
+        // Debug prints for movie data
         if (movie != null) {
           print('Movie: ${movie.title}');
           print('Cast: ${movie.cast}');
@@ -87,44 +225,8 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
           print('Status: ${movie.status}');
         }
 
-        if (isLoading && movie == null) {
-          return Scaffold(
-            appBar: AppBar(
-              title: const Text('Details'),
-              centerTitle: true,
-            ),
-            body: const Center(
-              child: LoadingIndicator(),
-            ),
-          );
-        }
-
-        if (error != null && movie == null) {
-          return Scaffold(
-            appBar: AppBar(
-              title: const Text('Details'),
-              centerTitle: true,
-            ),
-            body: app_error.ErrorWidget(
-              message: error,
-              onRetry: _refreshMovieDetails,
-            ),
-          );
-        }
-
-        if (movie == null) {
-          return Scaffold(
-            appBar: AppBar(
-              title: const Text('Details'),
-              centerTitle: true,
-            ),
-            body: const app_error.ErrorWidget(
-              message: 'Item not found',
-              icon: Icons.movie_filter,
-            ),
-          );
-        }
-
+        final contentTypeColor = movie.isMovie ? Colors.blue : Colors.purple;
+        final statusColor = _getStatusColor(movie.getStatusBadge());
         final List<CastModel> cast = movie.cast ?? [];
         final List<VideoModel> videos = movie.videos ?? [];
         final List<MovieModel> similar = movie.similar ?? [];
@@ -137,8 +239,26 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
             child: CustomScrollView(
               slivers: [
                 SliverAppBar(
-                  expandedHeight: 300,
+                  expandedHeight: 350,
                   pinned: true,
+                  backgroundColor: AppColors.background,
+                  elevation: 0,
+                  leading: IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    color: Colors.white,
+                    onPressed: () => Navigator.of(context).pop(),
+                    tooltip: 'Back',
+                  ),
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Icons.home),
+                      color: Colors.white,
+                      onPressed: () {
+                        Navigator.of(context).popUntil((route) => route.isFirst);
+                      },
+                      tooltip: 'Home',
+                    ),
+                  ],
                   flexibleSpace: FlexibleSpaceBar(
                     background: Stack(
                       fit: StackFit.expand,
@@ -177,35 +297,119 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
                           ),
                         ),
                         Positioned(
-                          bottom: 20,
-                          left: 20,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          left: 16,
+                          right: 16,
+                          bottom: 16,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              Text(
-                                movie.title,
-                                style: TextStyles.headline4.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
                               GestureDetector(
                                 onTap: () => _openFullscreenPoster(movie.getPosterUrl()),
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.image,
-                                      color: Colors.white,
-                                      size: 20,
+                                child: Hero(
+                                  tag: 'poster_${movie.id}',
+                                  child: Container(
+                                    width: 100,
+                                    height: 150,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(8),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.5),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 5),
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'View Poster',
-                                      style: TextStyles.bodyText2.copyWith(
-                                        color: Colors.white,
-                                        decoration: TextDecoration.underline,
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Stack(
+                                        children: [
+                                          CachedNetworkImage(
+                                            imageUrl: movie.getPosterUrl(size: 'w200'),
+                                            fit: BoxFit.cover,
+                                            height: 200,
+                                            width: 150,
+                                            placeholder: (context, url) => Container(
+                                              color: AppColors.cardBackground,
+                                              child: const Center(
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  color: AppColors.primary,
+                                                ),
+                                              ),
+                                            ),
+                                            errorWidget: (context, url, error) => Container(
+                                              color: AppColors.cardBackground,
+                                              child: const Icon(
+                                                Icons.movie,
+                                                color: AppColors.textSecondary,
+                                                size: 50,
+                                              ),
+                                            ),
+                                          ),
+                                          Positioned(
+                                            right: 4,
+                                            bottom: 4,
+                                            child: Container(
+                                              padding: const EdgeInsets.all(4),
+                                              decoration: BoxDecoration(
+                                                color: Colors.black.withOpacity(0.6),
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                              child: const Icon(
+                                                Icons.zoom_in,
+                                                color: Colors.white,
+                                                size: 16,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      movie.title,
+                                      style: TextStyles.headline4.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          movie.getYear(),
+                                          style: TextStyles.bodyText2.copyWith(
+                                            color: Colors.white.withOpacity(0.9),
+                                          ),
+                                        ),
+                                        if (movie.runtime > 0) ...[
+                                          const SizedBox(width: 8),
+                                          const Text(
+                                            '•',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            movie.getFormattedRuntime(),
+                                            style: TextStyles.bodyText2.copyWith(
+                                              color: Colors.white.withOpacity(0.9),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
                                     ),
                                   ],
                                 ),
@@ -223,49 +427,105 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
                     child: Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: movie.isMovie ? Colors.blue : Colors.purple,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            movie.isMovie ? 'Movie' : 'TV Show',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
+                            color: contentTypeColor.withOpacity(0.5),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: contentTypeColor,
+                              width: 1,
                             ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                movie.isMovie ? Icons.movie : Icons.tv,
+                                color: contentTypeColor,
+                                size: 17,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                movie.isMovie ? 'Movie' : 'TV Show',
+                                style: TextStyle(
+                                  color: contentTypeColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(width: 10),
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: _getStatusColor(movie.getStatusBadge()),
-                            borderRadius: BorderRadius.circular(5),
-                          ),
-                          child: Text(
-                            movie.getStatusBadge(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
+                            color: statusColor.withOpacity(0.5),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: statusColor,
+                              width: 1,
                             ),
                           ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _getStatusIcon(movie.getStatusBadge()),
+                                color: statusColor,
+                                size: 17,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                movie.getStatusBadge(),
+                                style: TextStyle(
+                                  color: statusColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
+                        const SizedBox(width: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _getRatingColor(movie.voteAverage).withOpacity(0.5),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: _getRatingColor(movie.voteAverage),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.star,
+                                color: _getRatingColor(movie.voteAverage),
+                                size: 17,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                movie.voteAverage.toStringAsFixed(1),
+                                style: TextStyles.bodyText2.copyWith(
+                                  color: _getRatingColor(movie.voteAverage),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
                       ],
                     ),
                   ),
                 ),
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 0),
                     child: MovieActions(
                       isInWatchlist: movieDetailsProvider.isInWatchlist,
                       isInFavorites: movieDetailsProvider.isInFavorites,
@@ -321,24 +581,5 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
         );
       },
     );
-  }
-
-  Color _getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'released':
-      case 'ongoing':
-        return Colors.green;
-      case 'in production':
-      case 'coming soon':
-        return Colors.orange;
-      case 'planned':
-        return Colors.blue;
-      case 'ended':
-        return Colors.purple;
-      case 'canceled':
-        return Colors.red;
-      default:
-        return Colors.grey;
-    }
   }
 }

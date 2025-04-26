@@ -17,6 +17,8 @@ class AppColors {
   // Status colors
   static const Color error = Color(0xFFE53935);
   static const Color success = Color(0xFF43A047);
+  static const Color yellow = Color(0xFFFFD233);
+  static const Color purple = Color(0x9CB016FD);
 
   // Gradients
   static const LinearGradient blackGradient = LinearGradient(

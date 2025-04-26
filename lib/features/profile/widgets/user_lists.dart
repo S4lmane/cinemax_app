@@ -169,6 +169,9 @@ class UserLists extends StatelessWidget {
                     ? DecorationImage(
                   image: NetworkImage(list.coverImageUrl),
                   fit: BoxFit.cover,
+                  onError: (exception, stackTrace) {
+                    // Handle image load error silently
+                  },
                 )
                     : null,
               ),
@@ -277,7 +280,12 @@ class UserLists extends StatelessWidget {
   }
 
   String _getTimeAgo(DateTime dateTime) {
-    final difference = DateTime.now().difference(dateTime);
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.isNegative) {
+      return 'just now'; // Handle future dates gracefully
+    }
 
     if (difference.inDays > 365) {
       return '${(difference.inDays / 365).floor()}y ago';

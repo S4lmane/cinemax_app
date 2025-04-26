@@ -7,17 +7,17 @@ import '../../../models/movie_model.dart';
 class MovieCard extends StatelessWidget {
   final MovieModel movie;
   final VoidCallback onTap;
-  final bool showRating;
 
   const MovieCard({
     Key? key,
     required this.movie,
     required this.onTap,
-    this.showRating = true,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final contentTypeColor = movie.isMovie ? Colors.blue : Colors.purple;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -34,96 +34,70 @@ class MovieCard extends StatelessWidget {
           ],
         ),
         clipBehavior: Clip.hardEdge,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Stack(
           children: [
-            // Poster Image
-            Stack(
-              children: [
-                AspectRatio(
-                  aspectRatio: 2/3,
-                  child: CachedNetworkImage(
-                    imageUrl: movie.getPosterUrl(),
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(
-                      color: AppColors.cardBackground,
-                      child: const Center(
-                        child: CircularProgressIndicator(
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      color: AppColors.cardBackground,
-                      child: const Center(
-                        child: Icon(
-                          Icons.error_outline,
-                          color: AppColors.error,
-                        ),
-                      ),
-                    ),
+            // Poster Image - Full coverage
+            CachedNetworkImage(
+              imageUrl: movie.getPosterUrl(),
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+              placeholder: (context, url) => Container(
+                color: AppColors.cardBackground,
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.primary,
                   ),
                 ),
-                if (showRating)
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.cardBackground.withOpacity(0.8),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.star,
-                            color: AppColors.primary,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            movie.voteAverage.toStringAsFixed(1),
-                            style: TextStyles.caption.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+              ),
+              errorWidget: (context, url, error) => Container(
+                color: AppColors.cardBackground,
+                child: const Center(
+                  child: Icon(
+                    Icons.error_outline,
+                    color: AppColors.error,
                   ),
-                // Add content type indicator
-                Positioned(
-                  bottom: 8,
-                  left: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
+                ),
+              ),
+            ),
+            // Content type indicator
+            Positioned(
+              bottom: 8,
+              left: 8,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: contentTypeColor.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: contentTypeColor,
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      movie.isMovie ? Icons.movie : Icons.tv,
+                      color: contentTypeColor,
+                      size: 16,
                     ),
-                    decoration: BoxDecoration(
-                      color: movie.isMovie
-                          ? Colors.blue.withOpacity(0.8)
-                          : Colors.purple.withOpacity(0.8),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
+                    const SizedBox(width: 4),
+                    Text(
                       movie.isMovie ? 'Movie' : 'TV',
                       style: TextStyles.caption.copyWith(
-                        color: Colors.white,
+                        color: contentTypeColor,
                         fontWeight: FontWeight.bold,
-                        fontSize: 10,
+                        fontSize: 12,
                       ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
-            // Removed title section as requested
           ],
         ),
       ),

@@ -67,8 +67,8 @@ class SearchResultItem extends StatelessWidget {
                 bottomLeft: Radius.circular(12),
               ),
               child: SizedBox(
-                width: 80,
-                height: 120,
+                width: 100,
+                height: 140,
                 child: CustomImage(
                   imageUrl: getPosterUrl(),
                   fit: BoxFit.cover,

@@ -70,8 +70,8 @@ class MovieHeader extends StatelessWidget {
                   child: Hero(
                     tag: 'poster_${movie.id}',
                     child: Container(
-                      width: 100,
-                      height: 150,
+                      width: 150,
+                      height: 200,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(8),
                         boxShadow: [

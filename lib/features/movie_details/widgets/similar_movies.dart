@@ -28,7 +28,7 @@ class SimilarMovies extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         SizedBox(
-          height: 220,
+          height: 180, // Adjusted height to match the poster's height since no title/rating section
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: movies.length,
@@ -93,97 +93,46 @@ class _SimilarMovieCard extends StatelessWidget {
             ),
           ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Poster
-            ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
-              ),
-              child: CachedNetworkImage(
-                imageUrl: movie.getPosterUrl(size: 'w200'),
-                width: 120,
-                height: 180,
-                fit: BoxFit.cover,
-                placeholder: (context, url) => Container(
-                  color: AppColors.cardBackground,
-                  child: const Center(
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-                errorWidget: (context, url, error) => Container(
-                  color: AppColors.cardBackground,
-                  width: 120,
-                  height: 180,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Icon(
-                        Icons.image_not_supported,
-                        color: AppColors.textSecondary,
-                        size: 32,
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'No Image',
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: CachedNetworkImage(
+            imageUrl: movie.getPosterUrl(size: 'w200'),
+            width: 120,
+            height: 180,
+            fit: BoxFit.cover,
+            placeholder: (context, url) => Container(
+              color: AppColors.cardBackground,
+              child: const Center(
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.primary,
                 ),
               ),
             ),
-
-            // Title and rating
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        movie.title,
-                        style: TextStyles.caption.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+            errorWidget: (context, url, error) => Container(
+              color: AppColors.cardBackground,
+              width: 120,
+              height: 180,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(
+                    Icons.image_not_supported,
+                    color: AppColors.textSecondary,
+                    size: 32,
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'No Image',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
                     ),
-                    // Rating row
-                    /*
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.star,
-                          color: AppColors.primary,
-                          size: 12,
-                        ),
-                        SizedBox(width: 2),
-                        Text(
-                          movie.voteAverage.toStringAsFixed(1),
-                          style: TextStyles.caption.copyWith(
-                            fontSize: 10,
-                          ),
-                        ),
-                      ],
-                    ),
-                    */
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );

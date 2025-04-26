@@ -1,6 +1,8 @@
 import 'dart:io';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/services/user_service.dart';
 import '../../../core/services/movie_service.dart';
 import '../../../core/utils/notification_service.dart';
@@ -13,17 +15,12 @@ class ProfileProvider extends ChangeNotifier {
   final MovieService _movieService = MovieService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // General loading state
+  // State variables
   bool _isLoading = false;
-
-  // Specific loading states for different sections
   bool _isLoadingWatchlist = false;
   bool _isLoadingFavorites = false;
-
   String? _error;
   UserModel? _userProfile;
-
-  // Content lists
   List<ListModel> _userLists = [];
   List<MovieModel> _watchlistItems = [];
   List<MovieModel> _favoriteItems = [];
@@ -37,19 +34,23 @@ class ProfileProvider extends ChangeNotifier {
   List<ListModel> get userLists => _userLists;
   List<MovieModel> get watchlistItems => _watchlistItems;
   List<MovieModel> get favoriteItems => _favoriteItems;
+  User? get currentUser => _auth.currentUser;
 
   // Initialize user profile
   Future<void> initializeUserProfile() async {
     final User? currentUser = _auth.currentUser;
     if (currentUser == null) {
+      print('Authentication Error: No authenticated user found');
       _setError('No authenticated user found');
       return;
     }
 
-    await getUserProfile(currentUser.uid);
-    await getUserLists(currentUser.uid);
-    await getWatchlistItems();
-    await getFavoriteItems();
+    await Future.wait([
+      getUserProfile(currentUser.uid),
+      getUserLists(currentUser.uid),
+      getWatchlistItems(),
+      getFavoriteItems(),
+    ]);
   }
 
   // Get user profile
@@ -59,16 +60,41 @@ class ProfileProvider extends ChangeNotifier {
 
     try {
       final profile = await _userService.getUserProfile(uid);
-      _userProfile = profile;
-
       if (profile == null) {
-        _setError('Failed to load user profile');
+        throw Exception('User profile not found');
       }
+      _userProfile = profile;
+      print('User profile loaded: ${profile.nickname}, Username: ${profile.username}');
     } catch (e) {
-      _setError('Failed to load user profile');
       print('Error getting user profile: $e');
+      _setError('Failed to load user profile: $e');
     } finally {
       _setLoading(false);
+    }
+  }
+
+  // Get user username (if not part of UserModel)
+  Future<String?> getUsername(String uid) async {
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
+
+      if (!userDoc.exists) {
+        throw Exception('User document not found');
+      }
+
+      final data = userDoc.data()!;
+      final username = data['username'] as String?;
+      if (username == null || username.isEmpty) {
+        throw Exception('Username not set for user');
+      }
+      return '@$username';
+    } catch (e) {
+      print('Error getting username: $e');
+      _setError('Failed to load username: $e');
+      return null;
     }
   }
 
@@ -78,59 +104,139 @@ class ProfileProvider extends ChangeNotifier {
     _clearError();
 
     try {
-      final lists = await _userService.getUserLists(uid);
-      _userLists = lists;
+      if (uid.isEmpty) {
+        throw Exception('Invalid UID: UID cannot be empty');
+      }
+
+      print('Fetching lists for UID: $uid');
+
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('lists')
+          .where('userId', isEqualTo: uid)
+          .get();
+
+      print('Retrieved ${querySnapshot.docs.length} lists');
+
+      _userLists = querySnapshot.docs
+          .map((doc) => ListModel.fromMap(doc.data(), doc.id))
+          .toList();
+
+      // Sort lists in memory by updatedAt (avoiding orderBy due to SDK issue)
+      _userLists.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     } catch (e) {
-      _setError('Failed to load user lists');
       print('Error getting user lists: $e');
+      _setError('Failed to load user lists: $e');
     } finally {
       _setLoading(false);
     }
   }
 
+  // Add an item to a list
+  Future<bool> addItemToList(String listId, String itemId) async {
+    try {
+      final User? currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        print('Authentication Error: No authenticated user found');
+        _setError('No authenticated user found');
+        return false;
+      }
+
+      print('Adding item $itemId to list $listId for user ${currentUser.uid}');
+
+      final listDoc = await FirebaseFirestore.instance
+          .collection('lists')
+          .doc(listId)
+          .get();
+
+      if (!listDoc.exists) {
+        print('List $listId does not exist');
+        _setError('List does not exist');
+        return false;
+      }
+
+      final listData = listDoc.data()!;
+      if (listData['userId'] != currentUser.uid) {
+        print('Permission Error: User ${currentUser.uid} does not own list $listId');
+        _setError('You do not have permission to modify this list');
+        return false;
+      }
+
+      List<String> currentItemIds = List<String>.from(listData['itemIds'] ?? []);
+      if (currentItemIds.contains(itemId)) {
+        print('Item $itemId already in list $listId');
+        return true;
+      }
+
+      currentItemIds.add(itemId);
+
+      await FirebaseFirestore.instance
+          .collection('lists')
+          .doc(listId)
+          .update({
+        'itemIds': currentItemIds,
+        'itemCount': currentItemIds.length,
+        'updatedAt': Timestamp.fromDate(DateTime.now()),
+      });
+
+      print('Item $itemId added to list $listId successfully');
+
+      final index = _userLists.indexWhere((list) => list.id == listId);
+      if (index != -1) {
+        _userLists[index] = _userLists[index].copyWith(
+          itemIds: currentItemIds,
+          itemCount: currentItemIds.length,
+          updatedAt: DateTime.now(),
+        );
+        _notifySafely();
+      }
+
+      return true;
+    } catch (e) {
+      print('Error adding item to list: $e');
+      _setError('Failed to add item to list: $e');
+      return false;
+    }
+  }
+
   // Get watchlist items
   Future<void> getWatchlistItems() async {
-    _isLoadingWatchlist = true;
-    notifyListeners();
+    _setLoadingWatchlist(true);
+    _clearError();
 
     try {
       final User? currentUser = _auth.currentUser;
       if (currentUser == null) {
-        _isLoadingWatchlist = false;
-        notifyListeners();
-        return;
+        throw Exception('No authenticated user found');
       }
 
       final watchlistMovies = await _movieService.getWatchlistMovies();
       _watchlistItems = watchlistMovies;
     } catch (e) {
       print('Error getting watchlist items: $e');
+      _setError('Failed to load watchlist items: $e');
     } finally {
-      _isLoadingWatchlist = false;
-      notifyListeners();
+      _setLoadingWatchlist(false);
     }
   }
 
   // Get favorite items
   Future<void> getFavoriteItems() async {
-    _isLoadingFavorites = true;
-    notifyListeners();
+    _setLoadingFavorites(true);
+    _clearError();
 
     try {
       final User? currentUser = _auth.currentUser;
       if (currentUser == null) {
-        _isLoadingFavorites = false;
-        notifyListeners();
-        return;
+        throw Exception('No authenticated user found');
       }
 
       final favoriteMovies = await _movieService.getFavoriteMovies();
       _favoriteItems = favoriteMovies;
     } catch (e) {
       print('Error getting favorite items: $e');
+      _setError('Failed to load favorite items: $e');
     } finally {
-      _isLoadingFavorites = false;
-      notifyListeners();
+      _setLoadingFavorites(false);
     }
   }
 
@@ -149,13 +255,13 @@ class ProfileProvider extends ChangeNotifier {
     try {
       final success = await _movieService.removeFromWatchlist(movieId);
       if (success) {
-        // Remove the item from local list
         _watchlistItems.removeWhere((movie) => movie.id == movieId);
-        notifyListeners();
+        _notifySafely();
       }
       return success;
     } catch (e) {
       print('Error removing from watchlist: $e');
+      _setError('Failed to remove from watchlist: $e');
       return false;
     }
   }
@@ -165,13 +271,13 @@ class ProfileProvider extends ChangeNotifier {
     try {
       final success = await _movieService.removeFromFavorites(movieId);
       if (success) {
-        // Remove the item from local list
         _favoriteItems.removeWhere((movie) => movie.id == movieId);
-        notifyListeners();
+        _notifySafely();
       }
       return success;
     } catch (e) {
       print('Error removing from favorites: $e');
+      _setError('Failed to remove from favorites: $e');
       return false;
     }
   }
@@ -184,8 +290,7 @@ class ProfileProvider extends ChangeNotifier {
     try {
       final User? currentUser = _auth.currentUser;
       if (currentUser == null) {
-        _setError('No authenticated user found');
-        return false;
+        throw Exception('No authenticated user found');
       }
 
       await _userService.updateUserProfile(
@@ -196,8 +301,8 @@ class ProfileProvider extends ChangeNotifier {
       await getUserProfile(currentUser.uid);
       return true;
     } catch (e) {
-      _setError('Failed to update user profile');
       print('Error updating user profile: $e');
+      _setError('Failed to update user profile: $e');
       return false;
     } finally {
       _setLoading(false);
@@ -212,25 +317,34 @@ class ProfileProvider extends ChangeNotifier {
     try {
       final User? currentUser = _auth.currentUser;
       if (currentUser == null) {
-        _setError('No authenticated user found');
-        return false;
+        throw Exception('No authenticated user found');
       }
 
-      final imageUrl = await _userService.uploadProfileImage(
-        currentUser.uid,
-        imageFile,
-      );
+      print('Uploading profile image for user: ${currentUser.uid}');
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('profile_images/${currentUser.uid}/profile.jpg');
 
-      await _userService.updateUserProfile(
-        uid: currentUser.uid,
-        profileImageUrl: imageUrl,
-      );
+      final uploadTask = storageRef.putFile(imageFile);
+      final snapshot = await uploadTask.whenComplete(() {});
+      if (snapshot.state != TaskState.success) {
+        throw Exception('Upload failed: ${snapshot.state}');
+      }
+
+      await Future.delayed(Duration(seconds: 1));
+      final imageUrl = await storageRef.getDownloadURL();
+      print('Profile image uploaded successfully: $imageUrl');
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .update({'profileImageUrl': imageUrl});
 
       await getUserProfile(currentUser.uid);
       return true;
     } catch (e) {
-      _setError('Failed to upload profile image');
       print('Error uploading profile image: $e');
+      _setError('Failed to upload profile image: $e');
       return false;
     } finally {
       _setLoading(false);
@@ -245,25 +359,34 @@ class ProfileProvider extends ChangeNotifier {
     try {
       final User? currentUser = _auth.currentUser;
       if (currentUser == null) {
-        _setError('No authenticated user found');
-        return false;
+        throw Exception('No authenticated user found');
       }
 
-      final imageUrl = await _userService.uploadBannerImage(
-        currentUser.uid,
-        imageFile,
-      );
+      print('Uploading banner image for user: ${currentUser.uid}');
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('banner_images/${currentUser.uid}/banner.jpg');
 
-      await _userService.updateUserProfile(
-        uid: currentUser.uid,
-        bannerImageUrl: imageUrl,
-      );
+      final uploadTask = storageRef.putFile(imageFile);
+      final snapshot = await uploadTask.whenComplete(() {});
+      if (snapshot.state != TaskState.success) {
+        throw Exception('Upload failed: ${snapshot.state}');
+      }
+
+      await Future.delayed(Duration(seconds: 1));
+      final imageUrl = await storageRef.getDownloadURL();
+      print('Banner image uploaded successfully: $imageUrl');
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .update({'bannerImageUrl': imageUrl});
 
       await getUserProfile(currentUser.uid);
       return true;
     } catch (e) {
-      _setError('Failed to upload banner image');
       print('Error uploading banner image: $e');
+      _setError('Failed to upload banner image: $e');
       return false;
     } finally {
       _setLoading(false);
@@ -278,40 +401,45 @@ class ProfileProvider extends ChangeNotifier {
     try {
       final User? currentUser = _auth.currentUser;
       if (currentUser == null) {
-        _setError('No authenticated user found');
-        return false;
+        throw Exception('No authenticated user found');
       }
 
-      // Use StorageService to upload the image
-      final storageService = await _userService.getStorageService();
-      final imageUrl = await storageService.uploadListCoverImage(
-        currentUser.uid,
-        listId,
-        imageFile,
-      );
+      print('Uploading list cover image for user: ${currentUser.uid}, list: $listId');
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('list_covers/${currentUser.uid}/$listId.jpg');
 
-      // Update list cover in Firestore
-      final success = await _userService.updateListCover(
-        currentUser.uid,
-        listId,
-        imageUrl,
-      );
-
-      if (success) {
-        // Update local list data
-        final index = _userLists.indexWhere((list) => list.id == listId);
-        if (index != -1) {
-          _userLists[index] = _userLists[index].copyWith(
-            coverImageUrl: imageUrl,
-          );
-          notifyListeners();
-        }
+      final uploadTask = storageRef.putFile(imageFile);
+      final snapshot = await uploadTask.whenComplete(() {});
+      if (snapshot.state != TaskState.success) {
+        throw Exception('Upload failed: ${snapshot.state}');
       }
 
-      return success;
+      await Future.delayed(Duration(seconds: 1));
+      final imageUrl = await storageRef.getDownloadURL();
+      print('List cover image uploaded successfully: $imageUrl');
+
+      await FirebaseFirestore.instance
+          .collection('lists')
+          .doc(listId)
+          .update({
+        'coverImageUrl': imageUrl,
+        'updatedAt': Timestamp.fromDate(DateTime.now()),
+      });
+
+      final index = _userLists.indexWhere((list) => list.id == listId);
+      if (index != -1) {
+        _userLists[index] = _userLists[index].copyWith(
+          coverImageUrl: imageUrl,
+          updatedAt: DateTime.now(),
+        );
+        _notifySafely();
+      }
+
+      return true;
     } catch (e) {
-      _setError('Failed to upload list cover image');
       print('Error uploading list cover image: $e');
+      _setError('Failed to upload list cover image: $e');
       return false;
     } finally {
       _setLoading(false);
@@ -319,7 +447,7 @@ class ProfileProvider extends ChangeNotifier {
   }
 
   // Create a new list
-  Future<ListModel?> createList({
+  Future<String?> createList({
     required String name,
     required String description,
     required bool isPublic,
@@ -330,32 +458,57 @@ class ProfileProvider extends ChangeNotifier {
     _setLoading(true);
     _clearError();
 
+    String? createdListId;
+
     try {
       final User? currentUser = _auth.currentUser;
       if (currentUser == null) {
-        _setError('No authenticated user found');
-        return null;
+        throw Exception('No authenticated user found');
       }
 
-      final newList = await _userService.createList(
-        name: name,
-        description: description,
-        isPublic: isPublic,
-        allowMovies: allowMovies,
-        allowTvShows: allowTvShows,
-      );
+      print('Creating list for user: ${currentUser.uid}');
 
-      if (newList != null && coverImage != null) {
-        // Upload cover image if provided
-        await uploadListCoverImage(newList.id, coverImage);
+      final now = DateTime.now();
+      final listData = {
+        'userId': currentUser.uid,
+        'name': name,
+        'description': description,
+        'coverImageUrl': '',
+        'isPublic': isPublic,
+        'allowMovies': allowMovies,
+        'allowTvShows': allowTvShows,
+        'itemIds': <String>[],
+        'createdAt': Timestamp.fromDate(now),
+        'updatedAt': Timestamp.fromDate(now),
+        'itemCount': 0,
+      };
+
+      final docRef = await FirebaseFirestore.instance
+          .collection('lists')
+          .add(listData);
+
+      createdListId = docRef.id;
+      print('List created with ID: $createdListId');
+
+      if (coverImage != null) {
+        final success = await uploadListCoverImage(createdListId, coverImage);
+        if (!success) {
+          print('Warning: Failed to upload cover image, but list was created');
+          _setError('List created, but failed to upload cover image');
+        }
       }
 
-      // Refresh lists
-      await getUserLists(currentUser.uid);
-      return newList;
+      try {
+        await getUserLists(currentUser.uid);
+      } catch (e) {
+        print('Warning: Failed to refresh lists after creation: $e');
+        _setError('List created, but failed to refresh lists: $e');
+      }
+
+      return createdListId;
     } catch (e) {
-      _setError('Failed to create list');
       print('Error creating list: $e');
+      _setError('Failed to create list: $e');
       return null;
     } finally {
       _setLoading(false);
@@ -365,17 +518,33 @@ class ProfileProvider extends ChangeNotifier {
   // Helper methods
   void _setLoading(bool value) {
     _isLoading = value;
-    notifyListeners();
+    _notifySafely();
+  }
+
+  void _setLoadingWatchlist(bool value) {
+    _isLoadingWatchlist = value;
+    _notifySafely();
+  }
+
+  void _setLoadingFavorites(bool value) {
+    _isLoadingFavorites = value;
+    _notifySafely();
   }
 
   void _setError(String error) {
     _error = error;
-    notifyListeners();
+    _notifySafely();
   }
 
   void _clearError() {
     _error = null;
-    notifyListeners();
+    _notifySafely();
+  }
+
+  void _notifySafely() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
   }
 
   // Clear all data
@@ -388,6 +557,6 @@ class ProfileProvider extends ChangeNotifier {
     _isLoading = false;
     _isLoadingWatchlist = false;
     _isLoadingFavorites = false;
-    notifyListeners();
+    _notifySafely();
   }
 }

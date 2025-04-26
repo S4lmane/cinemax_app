@@ -18,38 +18,253 @@ class MovieInfo extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Status section for TV shows or movies
+        if (!movie.isMovie && movie.status == 'Returning Series') ...[
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 16),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.green,
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.play_circle_outline,
+                  color: Colors.green,
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Currently Airing',
+                        style: TextStyles.bodyText1.copyWith(
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'New episodes are being released',
+                        style: TextStyles.bodyText2.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ] else if (movie.status == 'In Production' ||
+            movie.status == 'Post Production' ||
+            movie.getStatusBadge() == 'Coming Soon') ...[
+          if (movie.releaseDate.isNotEmpty) ...[
+            Builder(
+              builder: (context) {
+                DateTime? releaseDate = DateTime.tryParse(movie.releaseDate);
+                if (releaseDate != null && releaseDate.isAfter(DateTime.now())) {
+                  // Calculate countdown
+                  final now = DateTime.now();
+                  final difference = releaseDate.difference(now);
+                  String countdownText;
+                  if (difference.inDays >= 31) {
+                    final months = (difference.inDays / 30).floor();
+                    final days = difference.inDays % 30;
+                    final hours = (difference.inMinutes % (24 * 60)) ~/ 60;
+                    final minutes = difference.inMinutes % 60;
+                    countdownText = '$months months, $days days, $hours hours, $minutes minutes';
+                  } else {
+                    final days = difference.inDays;
+                    final hours = (difference.inMinutes % (24 * 60)) ~/ 60;
+                    final minutes = difference.inMinutes % 60;
+                    countdownText = '$days days, $hours hours, $minutes minutes';
+                  }
+
+                  return Container(
+                    margin: const EdgeInsets.symmetric(vertical: 16),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.red,
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.calendar_today,
+                          color: Colors.red,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Will be released on the ${releaseDate.toString().split(' ')[0]}',
+                                style: TextStyles.bodyText1.copyWith(
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                countdownText,
+                                style: TextStyles.bodyText2.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+          ],
+        ],
+        const SizedBox(height: 16),
+        // Overview section
+        const Text(
+          'Overview',
+          style: TextStyles.headline5,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          movie.overview.isNotEmpty
+              ? movie.overview
+              : 'No overview available for this ${movie.isMovie ? 'movie' : 'TV show'}.',
+          style: TextStyles.bodyText1.copyWith(
+            color: AppColors.textSecondary,
+            height: 1.5,
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Director/Creator with Rating
+        if (movie.isMovie && movie.director != null && movie.director!.isNotEmpty) ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(child: _buildInfoRow('Director', movie.director!)),
+              const SizedBox(width: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _getRatingColor(movie.voteAverage).withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: _getRatingColor(movie.voteAverage),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.star,
+                      color: _getRatingColor(movie.voteAverage),
+                      size: 16,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      movie.voteAverage.toStringAsFixed(1),
+                      style: TextStyles.bodyText2.copyWith(
+                        color: _getRatingColor(movie.voteAverage),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+        ] else if (!movie.isMovie && movie.creator != null && movie.creator!.isNotEmpty) ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(child: _buildInfoRow('Creator', movie.creator!)),
+              const SizedBox(width: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _getRatingColor(movie.voteAverage).withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: _getRatingColor(movie.voteAverage),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.star,
+                      color: _getRatingColor(movie.voteAverage),
+                      size: 16,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      movie.voteAverage.toStringAsFixed(1),
+                      style: TextStyles.bodyText2.copyWith(
+                        color: _getRatingColor(movie.voteAverage),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+        ],
+        // Vote count and runtime
         Row(
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: _getRatingColor(movie.voteAverage),
-                borderRadius: BorderRadius.circular(16),
+                color: Colors.grey.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Colors.grey,
+                  width: 1,
+                ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(
-                    Icons.star,
-                    color: Colors.yellow,
+                  Icon(
+                    Icons.how_to_vote,
+                    color: Colors.grey,
                     size: 16,
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    movie.voteAverage.toStringAsFixed(1),
+                    '${movie.voteCount} votes',
                     style: TextStyles.bodyText2.copyWith(
-                      color: Colors.white,
+                      color: Colors.grey,
                       fontWeight: FontWeight.bold,
+                      fontSize: 12,
                     ),
                   ),
                 ],
-              ),
-            ),
-            const SizedBox(width: 16),
-            Text(
-              '${movie.voteCount} votes',
-              style: TextStyles.bodyText2.copyWith(
-                color: AppColors.textSecondary,
               ),
             ),
             if (movie.runtime > 0) ...[
@@ -75,6 +290,36 @@ class MovieInfo extends StatelessWidget {
             ],
           ],
         ),
+        const SizedBox(height: 16),
+        // Genres
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: movie.genres.map((genre) {
+            return Chip(
+              label: Text(
+                genre,
+                style: TextStyles.caption.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              backgroundColor: AppColors.textSecondary.withOpacity(0.2),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(
+                  color: AppColors.textSecondary.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              elevation: 2,
+              shadowColor: Colors.black.withOpacity(0.1),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 16),
+        // Seasons and episodes for TV shows
         if (!movie.isMovie && (movie.numberOfSeasons != null || movie.numberOfEpisodes != null)) ...[
           const SizedBox(height: 16),
           Row(
@@ -143,80 +388,9 @@ class MovieInfo extends StatelessWidget {
             ],
           ),
         ],
-        if (!movie.isMovie && movie.status == 'Returning Series') ...[
-          Container(
-            margin: const EdgeInsets.symmetric(vertical: 16),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Colors.green,
-                width: 1,
-              ),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.play_circle_outline,
-                  color: Colors.green,
-                  size: 24,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Currently Airing',
-                        style: TextStyles.bodyText1.copyWith(
-                          color: Colors.green,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'New episodes are being released',
-                        style: TextStyles.bodyText2.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ] else if (movie.status == 'In Production' ||
-            movie.status == 'Post Production' ||
-            movie.getStatusBadge() == 'Coming Soon') ...[
-          if (movie.releaseDate.isNotEmpty) ...[
-            Builder(
-              builder: (context) {
-                DateTime? releaseDate = DateTime.tryParse(movie.releaseDate);
-                if (releaseDate != null && releaseDate.isAfter(DateTime.now())) {
-                  return Container(
-                    margin: const EdgeInsets.symmetric(vertical: 16),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.cardBackground,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      'Releasing on ${releaseDate.toString().split(' ')[0]}',
-                      style: TextStyles.bodyText2.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  );
-                }
-                return const SizedBox.shrink();
-              },
-            ),
-          ],
-        ],
-        const SizedBox(height: 24),
+        // Seasons list for TV shows
         if (!movie.isMovie && movie.numberOfSeasons != null && movie.numberOfSeasons! > 0) ...[
+          const SizedBox(height: 16),
           Text(
             'Seasons',
             style: TextStyles.headline5,
@@ -238,55 +412,6 @@ class MovieInfo extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 24),
-        const Text(
-          'Overview',
-          style: TextStyles.headline5,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          movie.overview.isNotEmpty
-              ? movie.overview
-              : 'No overview available for this ${movie.isMovie ? 'movie' : 'TV show'}.',
-          style: TextStyles.bodyText1.copyWith(
-            color: AppColors.textSecondary,
-            height: 1.5,
-          ),
-        ),
-        const SizedBox(height: 16),
-        if (movie.isMovie && movie.director != null && movie.director!.isNotEmpty) ...[
-          _buildInfoRow('Director', movie.director!),
-          const SizedBox(height: 16),
-        ] else if (!movie.isMovie && movie.creator != null && movie.creator!.isNotEmpty) ...[
-          _buildInfoRow('Creator', movie.creator!),
-          const SizedBox(height: 16),
-        ],
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: movie.genres.map((genre) {
-            return Chip(
-              label: Text(
-                genre,
-                style: TextStyles.caption.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              backgroundColor: AppColors.textSecondary.withOpacity(0.2),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: BorderSide(
-                  color: AppColors.textSecondary.withOpacity(0.3),
-                  width: 1,
-                ),
-              ),
-              elevation: 2,
-              shadowColor: Colors.black.withOpacity(0.1),
-            );
-          }).toList(),
-        ),
-        const SizedBox(height: 16),
       ],
     );
   }
@@ -352,7 +477,7 @@ class MovieInfo extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(8.0),
+              padding: const EdgeInsets.all(0),
               child: Column(
                 children: [
                   Text(

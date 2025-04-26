@@ -1,4 +1,3 @@
-// lib/features/search/screens/search_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
@@ -30,8 +29,7 @@ class _SearchScreenState extends State<SearchScreen> {
   List<String> _searchHistory = [];
   bool _isFilterOpen = false;
 
-  // Filter states
-  String _contentType = 'all'; // 'all', 'movies', 'tv'
+  String _contentType = 'all';
   String _selectedGenre = 'all';
   RangeValues _yearRange = RangeValues(1900, DateTime.now().year.toDouble());
   double _minRating = 0.0;
@@ -51,7 +49,6 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
-  // Load search history from SharedPreferences
   Future<void> _loadSearchHistory() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -64,16 +61,13 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  // Save search history to SharedPreferences
   Future<void> _saveSearchHistory(String query) async {
     if (query.isEmpty) return;
 
     try {
-      // Add to the beginning of list and remove duplicates
       setState(() {
         _searchHistory.remove(query);
         _searchHistory.insert(0, query);
-        // Keep only the latest 10 searches
         if (_searchHistory.length > 10) {
           _searchHistory = _searchHistory.sublist(0, 10);
         }
@@ -86,7 +80,6 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  // Clear search history
   Future<void> _clearSearchHistory() async {
     try {
       setState(() {
@@ -106,7 +99,6 @@ class _SearchScreenState extends State<SearchScreen> {
     });
 
     if (_searchController.text.length > 2) {
-      // Debounce search
       Future.delayed(const Duration(milliseconds: 500), () {
         if (_searchController.text.length > 2) {
           _performSearch(_searchController.text);
@@ -120,7 +112,6 @@ class _SearchScreenState extends State<SearchScreen> {
 
     final searchProvider = Provider.of<SearchProvider>(context, listen: false);
 
-    // Apply filters
     searchProvider.setFilters(
       contentType: _contentType,
       genre: _selectedGenre != 'all' ? _selectedGenre : null,
@@ -130,9 +121,6 @@ class _SearchScreenState extends State<SearchScreen> {
     );
 
     searchProvider.searchMovies(query);
-
-    // Save to search history
-    _saveSearchHistory(query);
   }
 
   void _clearSearch() {
@@ -159,14 +147,16 @@ class _SearchScreenState extends State<SearchScreen> {
       if (minRating != null) _minRating = minRating;
     });
 
-    // Apply the filter if a search is active
     if (_searchController.text.isNotEmpty) {
       _performSearch(_searchController.text);
     }
   }
 
   void _navigateToMovieDetails(dynamic item) {
-    // Extract common data regardless of type
+    if (_searchController.text.isNotEmpty) {
+      _saveSearchHistory(_searchController.text.trim());
+    }
+
     String movieId;
     bool isMovie;
 
@@ -177,9 +167,8 @@ class _SearchScreenState extends State<SearchScreen> {
       movieId = item.id;
       isMovie = item.isMovie;
     } else if (item is String) {
-      // Handle case where just an ID is passed
       movieId = item;
-      isMovie = true; // Default to movie - you might need a better way to determine this
+      isMovie = true;
     } else {
       print('Unexpected type for movie details navigation: ${item.runtimeType}');
       return;
@@ -198,7 +187,6 @@ class _SearchScreenState extends State<SearchScreen> {
       ),
     );
 
-    // Add to recently viewed if we have enough data
     if (item is MovieModel) {
       RecentItemsService.addRecentItem(item);
     } else if (item is Map<String, dynamic> &&
@@ -228,7 +216,6 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Search bar
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Row(
@@ -260,7 +247,6 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
             ),
 
-            // Filters section (expandable)
             if (_isFilterOpen)
               SearchFilters(
                 contentType: _contentType,
@@ -270,7 +256,6 @@ class _SearchScreenState extends State<SearchScreen> {
                 onFilterChanged: _updateFilters,
               ),
 
-            // Active filters chips (only show when filters are applied)
             if (_contentType != 'all' || _selectedGenre != 'all' ||
                 _yearRange.start > 1900 || _yearRange.end < DateTime.now().year ||
                 _minRating > 0.0)
@@ -331,7 +316,6 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
               ),
 
-            // Search results or suggestions
             Expanded(
               child: Consumer<SearchProvider>(
                 builder: (context, searchProvider, _) {
@@ -387,8 +371,7 @@ class _SearchScreenState extends State<SearchScreen> {
                             left: 16,
                             right: 16,
                             top: 8,
-                            // Add bottom padding to prevent overflow
-                            bottom: 80,
+                            bottom: 16,
                           ),
                           itemCount: searchResults.length + (isLoading ? 1 : 0) + (searchProvider.hasMoreResults ? 1 : 0),
                           itemBuilder: (context, index) {
@@ -418,7 +401,6 @@ class _SearchScreenState extends State<SearchScreen> {
                             if (index < searchResults.length) {
                               final result = searchResults[index];
 
-                              // Extract needed information based on result type
                               String id;
                               String title;
                               String posterPath;
@@ -444,7 +426,6 @@ class _SearchScreenState extends State<SearchScreen> {
                                 overview = result.overview;
                                 releaseDate = result.releaseDate;
                               } else {
-                                // Handle unexpected type
                                 return const SizedBox.shrink();
                               }
 
@@ -463,7 +444,6 @@ class _SearchScreenState extends State<SearchScreen> {
                           },
                         ),
 
-                        // Loading overlay
                         if (isLoading && searchResults.isNotEmpty)
                           Positioned(
                             top: 0,
@@ -493,7 +473,6 @@ class _SearchScreenState extends State<SearchScreen> {
                     );
                   }
 
-                  // Show search suggestions and history
                   return _buildSearchSuggestions();
                 },
               ),

@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/text_styles.dart';
-import '../providers/list_provider.dart';
+import '../../profile/providers/profile_provider.dart';
 import 'list_screen.dart';
 
 class CreateListScreen extends StatefulWidget {
@@ -66,9 +66,9 @@ class _CreateListScreenState extends State<CreateListScreen> {
     });
 
     try {
-      final listProvider = Provider.of<ListProvider>(context, listen: false);
+      final profileProvider = Provider.of<ProfileProvider>(context, listen: false);
 
-      final listId = await listProvider.createList(
+      final listId = await profileProvider.createList(
         name: _nameController.text.trim(),
         description: _descriptionController.text.trim(),
         isPublic: _isPublic,
@@ -91,7 +91,7 @@ class _CreateListScreenState extends State<CreateListScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(listProvider.error ?? 'Failed to create list'),
+              content: Text(profileProvider.error ?? 'Failed to create list'),
               backgroundColor: AppColors.error,
             ),
           );
@@ -208,7 +208,9 @@ class _CreateListScreenState extends State<CreateListScreen> {
                   title: const Text('Public List'),
                   subtitle: const Text('Anyone can view this list'),
                   value: _isPublic,
-                  onChanged: _isLoading ? null : (value) {
+                  onChanged: _isLoading
+                      ? null
+                      : (value) {
                     setState(() {
                       _isPublic = value;
                     });
@@ -230,7 +232,9 @@ class _CreateListScreenState extends State<CreateListScreen> {
                 CheckboxListTile(
                   title: const Text('Movies'),
                   value: _allowMovies,
-                  onChanged: _isLoading ? null : (value) {
+                  onChanged: _isLoading
+                      ? null
+                      : (value) {
                     setState(() {
                       _allowMovies = value ?? false;
                       // Ensure at least one content type is selected
@@ -245,7 +249,9 @@ class _CreateListScreenState extends State<CreateListScreen> {
                 CheckboxListTile(
                   title: const Text('TV Shows'),
                   value: _allowTvShows,
-                  onChanged: _isLoading ? null : (value) {
+                  onChanged: _isLoading
+                      ? null
+                      : (value) {
                     setState(() {
                       _allowTvShows = value ?? false;
                       // Ensure at least one content type is selected

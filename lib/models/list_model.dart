@@ -11,8 +11,8 @@ class ListModel {
   final bool allowTvShows;
   final List<String> itemIds; // IDs of movies/shows in the list
   final DateTime createdAt;
-  DateTime updatedAt;
-  int itemCount;
+  final DateTime updatedAt;
+  final int itemCount;
 
   ListModel({
     required this.id,
@@ -32,21 +32,21 @@ class ListModel {
   factory ListModel.fromMap(Map<String, dynamic> map, String id) {
     return ListModel(
       id: id,
-      userId: map['userId'] ?? '',
-      name: map['name'] ?? '',
-      description: map['description'] ?? '',
-      coverImageUrl: map['coverImageUrl'] ?? '',
-      isPublic: map['isPublic'] ?? false,
-      allowMovies: map['allowMovies'] ?? true,
-      allowTvShows: map['allowTvShows'] ?? true,
-      itemIds: List<String>.from(map['itemIds'] ?? []),
+      userId: map['userId'] as String? ?? '',
+      name: map['name'] as String? ?? '',
+      description: map['description'] as String? ?? '',
+      coverImageUrl: map['coverImageUrl'] as String? ?? '',
+      isPublic: map['isPublic'] as bool? ?? false,
+      allowMovies: map['allowMovies'] as bool? ?? true,
+      allowTvShows: map['allowTvShows'] as bool? ?? true,
+      itemIds: List<String>.from(map['itemIds'] as List? ?? []),
       createdAt: map['createdAt'] != null
           ? (map['createdAt'] as Timestamp).toDate()
           : DateTime.now(),
       updatedAt: map['updatedAt'] != null
           ? (map['updatedAt'] as Timestamp).toDate()
           : DateTime.now(),
-      itemCount: map['itemCount'] ?? 0,
+      itemCount: map['itemCount'] as int? ?? 0,
     );
   }
 
@@ -60,8 +60,8 @@ class ListModel {
       'allowMovies': allowMovies,
       'allowTvShows': allowTvShows,
       'itemIds': itemIds,
-      'createdAt': createdAt,
-      'updatedAt': updatedAt,
+      'createdAt': Timestamp.fromDate(createdAt),
+      'updatedAt': Timestamp.fromDate(updatedAt),
       'itemCount': itemCount,
     };
   }
