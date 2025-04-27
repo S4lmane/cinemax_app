@@ -161,36 +161,6 @@ class MovieInfo extends StatelessWidget {
             children: [
               Expanded(child: _buildInfoRow('Director', movie.director!)),
               const SizedBox(width: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _getRatingColor(movie.voteAverage).withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: _getRatingColor(movie.voteAverage),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.star,
-                      color: _getRatingColor(movie.voteAverage),
-                      size: 16,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      movie.voteAverage.toStringAsFixed(1),
-                      style: TextStyles.bodyText2.copyWith(
-                        color: _getRatingColor(movie.voteAverage),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -200,36 +170,6 @@ class MovieInfo extends StatelessWidget {
             children: [
               Expanded(child: _buildInfoRow('Creator', movie.creator!)),
               const SizedBox(width: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _getRatingColor(movie.voteAverage).withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: _getRatingColor(movie.voteAverage),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.star,
-                      color: _getRatingColor(movie.voteAverage),
-                      size: 16,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      movie.voteAverage.toStringAsFixed(1),
-                      style: TextStyles.bodyText2.copyWith(
-                        color: _getRatingColor(movie.voteAverage),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -240,12 +180,48 @@ class MovieInfo extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.grey.withOpacity(0.5),
+                color: _getRatingColor(movie.voteAverage).withOpacity(0.5),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: Colors.grey,
+                  color: _getRatingColor(movie.voteAverage),
                   width: 1,
                 ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.star,
+                    color: _getRatingColor(movie.voteAverage),
+                    size: 16,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    movie.voteAverage.toStringAsFixed(1),
+                    style: TextStyles.bodyText2.copyWith(
+                      color: _getRatingColor(movie.voteAverage),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            Icon(
+              Icons.navigate_next_outlined,
+              color: _getRatingColor(movie.voteAverage),
+              size: 20,
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.grey.withOpacity(0),
+                borderRadius: BorderRadius.circular(8),
+                //border: Border.all(
+                //  color: Colors.grey,
+                //  width: 1,
+                //),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -431,9 +407,9 @@ class MovieInfo extends StatelessWidget {
         );
       },
       child: Container(
-        width: 120,
+        width: 100,// to remove the overflow at the bottom of the card
         decoration: BoxDecoration(
-          color: AppColors.cardBackground,
+          color: Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
@@ -443,6 +419,7 @@ class MovieInfo extends StatelessWidget {
             ),
           ],
         ),
+        //fix the RenderFlex at the bottom of the first & last season's card
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -560,9 +537,10 @@ class MovieInfo extends StatelessWidget {
   }
 
   Color _getRatingColor(double rating) {
+    // if (rating == 10) return Color(0xFF007707);
     if (rating >= 8.0) return Colors.green;
-    if (rating >= 6.0) return Colors.orange;
-    if (rating >= 4.0) return Colors.amber;
+    if (rating >= 6.0 && rating < 8.0) return Colors.orange;
+    if (rating >= 4.0 && rating < 6.0) return Colors.amber;
     return Colors.red;
   }
 }

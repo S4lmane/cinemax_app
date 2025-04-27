@@ -69,7 +69,7 @@ class MovieGrid extends StatelessWidget {
           bottom: 80,
         ),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
+          crossAxisCount: 2, // item count per Row
           childAspectRatio: 0.58, // to fix the overflow reduced the aspec ratio from 0.6 to 0.55
           crossAxisSpacing: 16,
           mainAxisSpacing: 16,

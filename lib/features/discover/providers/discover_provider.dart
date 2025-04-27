@@ -49,42 +49,25 @@ class DiscoverProvider extends ChangeNotifier {
     _clearError();
 
     try {
-      // Use better filters to get truly "new" movies - past 3 months, sorted by release date
-      final now = DateTime.now();
-      final threeMonthsAgo = DateTime(now.year, now.month - 3, now.day);
+      // Use the movie service
+      final movies = await _movieService.getNowPlayingMovies(page: page);
 
-      final endDate = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-      final startDate = "${threeMonthsAgo.year}-${threeMonthsAgo.month.toString().padLeft(2, '0')}-${threeMonthsAgo.day.toString().padLeft(2, '0')}";
-
-      final response = await _client.get(
-        Uri.parse(
-            '${ApiConstants.nowPlayingMovies}?api_key=${ApiConstants.apiKey}&language=en-US&page=$page' +
-                '&primary_release_date.gte=$startDate&primary_release_date.lte=$endDate&sort_by=primary_release_date.desc'
-        ),
-      );
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
-        final results = data['results'] as List;
-
-        // Filter for movies with at least decent ratings (>= 6.0)
-        final qualityMovies = results
-            .where((movie) => (movie['vote_average'] ?? 0.0) >= 6.0)
-            .map((json) => MovieModel.fromMap(json))
-            .toList();
-
-        if (page == 1) {
-          _newMovies = qualityMovies;
-        } else {
-          final existingIds = _newMovies.map((m) => m.id).toSet();
-          final newUniqueMovies = qualityMovies.where((m) => !existingIds.contains(m.id)).toList();
-          _newMovies = [..._newMovies, ...newUniqueMovies];
-        }
-
-        _setLoading(false);
+      if (movies.isEmpty) {
+        print("No new movies returned from movie_service");
       } else {
-        throw Exception('Failed to load new movies');
+        print("Fetched ${movies.length} new movies from movie_service");
       }
+
+      if (page == 1) {
+        _newMovies = movies;
+      } else {
+        // Add new movies without duplicates
+        final existingIds = _newMovies.map((m) => m.id).toSet();
+        final newUniqueMovies = movies.where((m) => !existingIds.contains(m.id)).toList();
+        _newMovies = [..._newMovies, ...newUniqueMovies];
+      }
+
+      _setLoading(false);
     } catch (e) {
       _setError('Failed to load new movies. Please try again.');
       print('Error fetching new movies: $e');
@@ -103,49 +86,25 @@ class DiscoverProvider extends ChangeNotifier {
     _clearError();
 
     try {
-      // Focus on truly popular and well-rated movies
-      final response = await _client.get(
-        Uri.parse(
-            '${ApiConstants.popularMovies}?api_key=${ApiConstants.apiKey}&language=en-US&page=$page' +
-                '&sort_by=popularity.desc&vote_count.gte=1000'
-        ),
-      );
+      // Use the movie service
+      final movies = await _movieService.getPopularMovies(page: page);
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
-        final List<dynamic> results = data['results'];
-
-        // Convert to MovieModel objects
-        final movies = results.map((json) => MovieModel.fromMap(json)).toList();
-
-        // Sort by popularity and vote average to ensure we get the best content first
-        movies.sort((a, b) {
-          // First by vote average (high to low)
-          final ratingCompare = b.voteAverage.compareTo(a.voteAverage);
-          if (ratingCompare != 0) return ratingCompare;
-
-          // Then by vote count (high to low) as a proxy for popularity
-          return b.voteCount.compareTo(a.voteCount);
-        });
-
-        // Set isMovie flag
-        for (var movie in movies) {
-          movie.isMovie = true;
-        }
-
-        if (page == 1) {
-          _popularMovies = movies;
-        } else {
-          // Add new movies without duplicates
-          final existingIds = _popularMovies.map((m) => m.id).toSet();
-          final newUniqueMovies = movies.where((m) => !existingIds.contains(m.id)).toList();
-          _popularMovies = [..._popularMovies, ...newUniqueMovies];
-        }
-
-        _setLoading(false);
+      if (movies.isEmpty) {
+        print("No popular movies returned from movie_service");
       } else {
-        throw Exception('Failed to load popular movies');
+        print("Fetched ${movies.length} popular movies from movie_service");
       }
+
+      if (page == 1) {
+        _popularMovies = movies;
+      } else {
+        // Add new movies without duplicates
+        final existingIds = _popularMovies.map((m) => m.id).toSet();
+        final newUniqueMovies = movies.where((m) => !existingIds.contains(m.id)).toList();
+        _popularMovies = [..._popularMovies, ...newUniqueMovies];
+      }
+
+      _setLoading(false);
     } catch (e) {
       _setError('Failed to load popular movies. Please try again.');
       print('Error fetching popular movies: $e');
@@ -161,68 +120,41 @@ class DiscoverProvider extends ChangeNotifier {
     _clearError();
 
     try {
-      // Ensure we're only getting future releases (from today to 6 months in the future)
-      final now = DateTime.now();
-      final sixMonthsLater = DateTime(now.year, now.month + 6, now.day);
+      // Use the movie service
+      final movies = await _movieService.getUpcomingMovies(page: page);
 
-      final todayDate = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-      final futureDate = "${sixMonthsLater.year}-${sixMonthsLater.month.toString().padLeft(2, '0')}-${sixMonthsLater.day.toString().padLeft(2, '0')}";
+      if (movies.isEmpty) {
+        print("No upcoming movies returned from movie_service");
+      } else {
+        print("Fetched ${movies.length} upcoming movies from movie_service");
+      }
 
-      final response = await _client.get(
-        Uri.parse(
-            '${ApiConstants.upcomingMovies}?api_key=${ApiConstants.apiKey}&language=en-US&page=$page' +
-                '&primary_release_date.gte=$todayDate&primary_release_date.lte=$futureDate&sort_by=primary_release_date.asc'
-        ),
-      );
+      // If we don't have enough upcoming movies, make additional API calls
+      if (movies.length < 10 && page == 1) {
+        print("Not enough upcoming movies, trying next page...");
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
-        final List<dynamic> results = data['results'];
+        // Try fetching page 2 as well
+        final page2Movies = await _movieService.getUpcomingMovies(page: 2);
 
-        // Convert to MovieModel objects
-        final movies = results.map((json) => MovieModel.fromMap(json)).toList();
+        // Add without duplicates
+        final allIds = movies.map((m) => m.id).toSet();
+        final uniquePage2Movies = page2Movies.where((m) => !allIds.contains(m.id)).toList();
 
-        // Further filter to ensure all dates are in the future
-        final filteredMovies = movies.where((movie) {
-          if (movie.releaseDate.isEmpty) return false;
-
-          try {
-            final releaseDate = DateTime.parse(movie.releaseDate);
-            return releaseDate.isAfter(DateTime.now());
-          } catch (_) {
-            return false;
-          }
-        }).toList();
-
-        // Sort by release date (soonest first)
-        filteredMovies.sort((a, b) {
-          try {
-            final dateA = DateTime.parse(a.releaseDate);
-            final dateB = DateTime.parse(b.releaseDate);
-            return dateA.compareTo(dateB);
-          } catch (_) {
-            return 0;
-          }
-        });
-
-        // Set isMovie flag
-        for (var movie in filteredMovies) {
-          movie.isMovie = true;
-        }
-
+        // Combine the results
+        final combinedMovies = [...movies, ...uniquePage2Movies];
+        _upcomingMovies = combinedMovies;
+      } else {
         if (page == 1) {
-          _upcomingMovies = filteredMovies;
+          _upcomingMovies = movies;
         } else {
           // Add new movies without duplicates
           final existingIds = _upcomingMovies.map((m) => m.id).toSet();
-          final newUniqueMovies = filteredMovies.where((m) => !existingIds.contains(m.id)).toList();
+          final newUniqueMovies = movies.where((m) => !existingIds.contains(m.id)).toList();
           _upcomingMovies = [..._upcomingMovies, ...newUniqueMovies];
         }
-
-        _setLoading(false);
-      } else {
-        throw Exception('Failed to load upcoming movies');
       }
+
+      _setLoading(false);
     } catch (e) {
       _setError('Failed to load upcoming movies. Please try again.');
       print('Error fetching upcoming movies: $e');
@@ -241,46 +173,25 @@ class DiscoverProvider extends ChangeNotifier {
     _clearError();
 
     try {
-      // Use better filters to get truly "new" TV shows - past 3 months, sorted by first air date
-      final now = DateTime.now();
-      final threeMonthsAgo = DateTime(now.year, now.month - 3, now.day);
+      // Use the MovieService method
+      final tvShows = await _movieService.getAiringTodayTVShows(page: page);
 
-      final endDate = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-      final startDate = "${threeMonthsAgo.year}-${threeMonthsAgo.month.toString().padLeft(2, '0')}-${threeMonthsAgo.day.toString().padLeft(2, '0')}";
-
-      final response = await _client.get(
-        Uri.parse(
-            '${ApiConstants.airingTodayTVShows}?api_key=${ApiConstants.apiKey}&language=en-US&page=$page' +
-                '&air_date.gte=$startDate&air_date.lte=$endDate&sort_by=first_air_date.desc'
-        ),
-      );
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
-        final results = data['results'] as List;
-
-        // Filter for shows with at least decent ratings (>= 6.5)
-        final qualityShows = results
-            .where((show) => (show['vote_average'] ?? 0.0) >= 6.5)
-            .map((json) => MovieModel.fromMap(json))
-            .toList();
-
-        for (var show in qualityShows) {
-          show.isMovie = false;
-        }
-
-        if (page == 1) {
-          _newTVShows = qualityShows;
-        } else {
-          final existingIds = _newTVShows.map((m) => m.id).toSet();
-          final newUniqueShows = qualityShows.where((m) => !existingIds.contains(m.id)).toList();
-          _newTVShows = [..._newTVShows, ...newUniqueShows];
-        }
-
-        _setLoading(false);
+      if (tvShows.isEmpty) {
+        print("No new TV shows returned from movie_service");
       } else {
-        throw Exception('Failed to load new TV shows');
+        print("Fetched ${tvShows.length} new TV shows from movie_service");
       }
+
+      if (page == 1) {
+        _newTVShows = tvShows;
+      } else {
+        // Add new shows without duplicates
+        final existingIds = _newTVShows.map((s) => s.id).toSet();
+        final newUniqueShows = tvShows.where((s) => !existingIds.contains(s.id)).toList();
+        _newTVShows = [..._newTVShows, ...newUniqueShows];
+      }
+
+      _setLoading(false);
     } catch (e) {
       _setError('Failed to load new TV shows. Please try again.');
       print('Error fetching new TV shows: $e');
@@ -296,58 +207,25 @@ class DiscoverProvider extends ChangeNotifier {
     _clearError();
 
     try {
-      // Focus on truly popular and well-rated TV shows
-      final response = await _client.get(
-        Uri.parse(
-            '${ApiConstants.popularTVShows}?api_key=${ApiConstants.apiKey}&language=en-US&page=$page' +
-                '&sort_by=popularity.desc&vote_count.gte=500'
-        ),
-      );
+      // Use the MovieService method
+      final shows = await _movieService.getPopularTVShows(page: page);
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
-        final List<dynamic> results = data['results'];
-
-        // Convert to MovieModel objects
-        final shows = results.map((json) => MovieModel.fromMap(json)).toList();
-
-        // Sort by popularity and vote average to ensure we get the best content first
-        shows.sort((a, b) {
-          // First by vote average (high to low)
-          final ratingCompare = b.voteAverage.compareTo(a.voteAverage);
-          if (ratingCompare != 0) return ratingCompare;
-
-          // Then by vote count (high to low) as a proxy for popularity
-          return b.voteCount.compareTo(a.voteCount);
-        });
-
-        // Set isMovie flag
-        for (var show in shows) {
-          show.isMovie = false;
-        }
-
-        // Take at least 10 shows if available
-        final minCount = 10;
-        final availableShows = shows.length;
-
-        if (page == 1) {
-          _popularTVShows = shows;
-
-          // If we didn't get enough shows, try to get more
-          if (availableShows < minCount && page < 5) {
-            await fetchPopularTVShows(page: page + 1, resetIfFirstPage: false);
-          }
-        } else {
-          // Add new shows without duplicates
-          final existingIds = _popularTVShows.map((m) => m.id).toSet();
-          final newUniqueShows = shows.where((m) => !existingIds.contains(m.id)).toList();
-          _popularTVShows = [..._popularTVShows, ...newUniqueShows];
-        }
-
-        _setLoading(false);
+      if (shows.isEmpty) {
+        print("No popular TV shows returned from movie_service");
       } else {
-        throw Exception('Failed to load popular TV shows');
+        print("Fetched ${shows.length} popular TV shows from movie_service");
       }
+
+      if (page == 1) {
+        _popularTVShows = shows;
+      } else {
+        // Add new shows without duplicates
+        final existingIds = _popularTVShows.map((s) => s.id).toSet();
+        final newUniqueShows = shows.where((s) => !existingIds.contains(s.id)).toList();
+        _popularTVShows = [..._popularTVShows, ...newUniqueShows];
+      }
+
+      _setLoading(false);
     } catch (e) {
       _setError('Failed to load popular TV shows. Please try again.');
       print('Error fetching popular TV shows: $e');
@@ -363,98 +241,85 @@ class DiscoverProvider extends ChangeNotifier {
     _clearError();
 
     try {
-      // For upcoming TV shows, we'll use on_the_air with future filter
-      final now = DateTime.now();
-      final sixMonthsLater = DateTime(now.year, now.month + 6, now.day);
+      // Use the MovieService method
+      final shows = await _movieService.getUpcomingTVShows(page: page);
 
-      final todayDate = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-      final futureDate = "${sixMonthsLater.year}-${sixMonthsLater.month.toString().padLeft(2, '0')}-${sixMonthsLater.day.toString().padLeft(2, '0')}";
-
-      // Multiple requests to ensure we get enough shows
-      List<MovieModel> allShows = [];
-
-      // Start with on_the_air
-      final responseOnAir = await _client.get(
-        Uri.parse(
-            '${ApiConstants.onTheAirTVShows}?api_key=${ApiConstants.apiKey}&language=en-US&page=$page' +
-                '&air_date.gte=$todayDate&sort_by=first_air_date.asc'
-        ),
-      );
-
-      if (responseOnAir.statusCode == 200) {
-        final data = json.decode(responseOnAir.body);
-        final results = data['results'] as List;
-
-        final shows = results.map((json) => MovieModel.fromMap(json)).toList();
-        for (var show in shows) {
-          show.isMovie = false;
-        }
-
-        allShows.addAll(shows);
-      }
-
-      // Also get shows from the discover endpoint to ensure we get enough
-      if (allShows.length < 10 || page > 1) {
-        final responseDiscover = await _client.get(
-          Uri.parse(
-              '${ApiConstants.discoverTV}?api_key=${ApiConstants.apiKey}&language=en-US&page=$page' +
-                  '&first_air_date.gte=$todayDate&first_air_date.lte=$futureDate&sort_by=first_air_date.asc'
-          ),
-        );
-
-        if (responseDiscover.statusCode == 200) {
-          final data = json.decode(responseDiscover.body);
-          final results = data['results'] as List;
-
-          final shows = results.map((json) => MovieModel.fromMap(json)).toList();
-          for (var show in shows) {
-            show.isMovie = false;
-          }
-
-          // Add without duplicates
-          final existingIds = allShows.map((s) => s.id).toSet();
-          allShows.addAll(shows.where((s) => !existingIds.contains(s.id)));
-        }
-      }
-
-      // Sort by release date
-      allShows.sort((a, b) {
-        if (a.releaseDate.isEmpty) return 1;
-        if (b.releaseDate.isEmpty) return -1;
-
-        try {
-          final dateA = DateTime.parse(a.releaseDate);
-          final dateB = DateTime.parse(b.releaseDate);
-          return dateA.compareTo(dateB);
-        } catch (_) {
-          return 0;
-        }
-      });
-
-      // Only include future shows
-      final futureShows = allShows.where((show) {
-        if (show.releaseDate.isEmpty) return false;
-
-        try {
-          final releaseDate = DateTime.parse(show.releaseDate);
-          return releaseDate.isAfter(DateTime.now());
-        } catch (_) {
-          return false;
-        }
-      }).toList();
-
-      if (page == 1) {
-        _upcomingTVShows = futureShows;
-
-        // If we didn't get enough shows, try to get more
-        if (futureShows.length < 10 && page < 3) {
-          await fetchUpcomingTVShows(page: page + 1, resetIfFirstPage: false);
-        }
+      if (shows.isEmpty) {
+        print("No upcoming TV shows returned from movie_service");
       } else {
-        // Add new shows without duplicates
-        final existingIds = _upcomingTVShows.map((m) => m.id).toSet();
-        final newUniqueShows = futureShows.where((m) => !existingIds.contains(m.id)).toList();
-        _upcomingTVShows = [..._upcomingTVShows, ...newUniqueShows];
+        print("Fetched ${shows.length} upcoming TV shows from movie_service");
+      }
+
+      // If we don't have enough upcoming shows, try multiple pages
+      if (shows.length < 10 && page == 1) {
+        print("Not enough upcoming TV shows, trying next page and fallback method...");
+
+        // Try additional pages
+        List<MovieModel> additionalShows = [];
+
+        // Try page 2
+        final page2Shows = await _movieService.getUpcomingTVShows(page: 2);
+        additionalShows.addAll(page2Shows);
+
+        // If still not enough, try a backup approach - get trending shows
+        if (shows.length + additionalShows.length < 10) {
+          try {
+            final now = DateTime.now();
+            final oneMonthAgo = now.subtract(const Duration(days: 30));
+            final startDateStr = oneMonthAgo.toString().substring(0, 10);
+
+            // Network IDs for major streaming platforms
+            final streamingNetworks = '213,49,1024,2739,2552,453';
+
+            // Get upcoming and recent shows with fallback
+            final _client.Client client = _movieService.client;
+            final response = await client.get(
+              Uri.parse(
+                '${ApiConstants.discoverTV}?api_key=${ApiConstants.apiKey}&language=en-US&with_networks=$streamingNetworks&first_air_date.gte=$startDateStr&sort_by=first_air_date.desc&vote_count.gte=10&page=1',
+              ),
+            );
+
+            if (response.statusCode == 200) {
+              final data = json.decode(response.body);
+              final results = data['results'] as List;
+
+              // Convert to MovieModel and set isMovie flag
+              final fallbackShows = results.map((json) => MovieModel.fromMap(json)).toList();
+              for (var show in fallbackShows) {
+                show.isMovie = false;
+              }
+
+              // Filter out non-narrative content
+              final filteredShows = fallbackShows.where((show) {
+                final title = show.title.toLowerCase();
+                return !title.contains('talk') &&
+                    !title.contains('tonight') &&
+                    !title.contains('late night') &&
+                    !title.contains('news') &&
+                    !title.contains('daily');
+              }).toList();
+
+              additionalShows.addAll(filteredShows);
+            }
+          } catch (e) {
+            print('Error in fallback upcoming TV shows approach: $e');
+          }
+        }
+
+        // Combine all results and remove duplicates
+        final allIds = shows.map((s) => s.id).toSet();
+        final uniqueAdditionalShows = additionalShows.where((s) => !allIds.contains(s.id)).toList();
+
+        _upcomingTVShows = [...shows, ...uniqueAdditionalShows];
+      } else {
+        if (page == 1) {
+          _upcomingTVShows = shows;
+        } else {
+          // Add new shows without duplicates
+          final existingIds = _upcomingTVShows.map((s) => s.id).toSet();
+          final newUniqueShows = shows.where((s) => !existingIds.contains(s.id)).toList();
+          _upcomingTVShows = [..._upcomingTVShows, ...newUniqueShows];
+        }
       }
 
       _setLoading(false);

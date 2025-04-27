@@ -109,6 +109,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
   }
 
   void _navigateToDetails(BuildContext context, MovieModel movie) {
+    print('Navigating to details: ID=${movie.id}, isMovie=${movie.isMovie}');
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -117,6 +118,23 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
           child: MovieDetailsScreen(
             movieId: movie.id,
             isMovie: movie.isMovie,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // to get movies/tvs from bookmarks of the user
+  void _navigateToWatchlistItem(BuildContext context, String itemId, bool isMovie) {
+    print('Navigating to watchlist/favorite item: ID=$itemId, isMovie=$isMovie');
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChangeNotifierProvider(
+          create: (_) => MovieDetailsProvider(),
+          child: MovieDetailsScreen(
+            movieId: itemId,
+            isMovie: isMovie,
           ),
         ),
       ),
@@ -223,6 +241,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
                 ),
                 child: TabBar(
                   controller: _contentTypeController,
+                  dividerHeight: 0,
                   indicatorPadding: const EdgeInsets.symmetric(
                     horizontal: 8,
                     vertical: 4,
@@ -244,7 +263,11 @@ class _DiscoverScreenState extends State<DiscoverScreen> with TickerProviderStat
                   unselectedLabelStyle: TextStyles.headline6.copyWith(
                     fontWeight: FontWeight.w400,
                   ),
-                  tabs: _contentTypes.map((type) => Tab(text: type)).toList(),
+                  // tabs: _contentTypes.map((type) => Tab(text: type)).toList(), // the tabs in here are ("Movies", "Tv Shows")
+                  tabs: [
+                    Tab(icon: Icon(Icons.movie)),
+                    Tab(icon: Icon(Icons.tv)),
+                  ],
                 ),
               ),
             ),
