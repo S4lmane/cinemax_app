@@ -1,3 +1,4 @@
+// lib/features/lists/widgets/list_item.dart
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/text_styles.dart';
@@ -10,11 +11,11 @@ class ListItem extends StatelessWidget {
   final VoidCallback? onRemove;
 
   const ListItem({
-    Key? key,
+    super.key,
     required this.movie,
     required this.onTap,
     this.onRemove,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -79,11 +80,8 @@ class ListItem extends StatelessWidget {
               ),
             ],
           ),
-          // Constrain the height to prevent overflow
-          constraints: BoxConstraints(
-            minHeight: 120,
-            maxHeight: 150,
-          ),
+          // Fixed height to prevent overflow
+          height: 140,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -95,7 +93,7 @@ class ListItem extends StatelessWidget {
                 ),
                 child: SizedBox(
                   width: 80,
-                  height: 120,
+                  height: 140,
                   child: CustomImage(
                     imageUrl: movie.getPosterUrl(size: 'w200'),
                     fit: BoxFit.cover,
@@ -103,12 +101,13 @@ class ListItem extends StatelessWidget {
                 ),
               ),
 
-              // Details
+              // Details - with Expanded to handle text overflow properly
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(12.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       // Title
                       Text(
@@ -152,7 +151,7 @@ class ListItem extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
 
-                      // Rating
+                      // Rating and runtime
                       Row(
                         children: [
                           const Icon(
@@ -174,8 +173,8 @@ class ListItem extends StatelessWidget {
                               color: AppColors.textSecondary,
                             ),
                           ),
+                          const Spacer(),
                           if (movie.runtime > 0) ...[
-                            const Spacer(),
                             Icon(
                               Icons.access_time,
                               size: 14,
@@ -192,26 +191,27 @@ class ListItem extends StatelessWidget {
                         ],
                       ),
 
-                      // Movie type indicator
-                      if (!movie.isMovie)
-                        Container(
-                          margin: const EdgeInsets.only(top: 8),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            'TV Show',
-                            style: TextStyles.caption.copyWith(
-                              color: Colors.blue,
-                              fontWeight: FontWeight.bold,
-                            ),
+                      // Spacer to push content type indicator to bottom
+                      const Spacer(),
+
+                      // Movie/TV indicator at the bottom
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: movie.isMovie ? Colors.blue.withOpacity(0.2) : Colors.purple.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          movie.isMovie ? 'Movie' : 'TV Show',
+                          style: TextStyles.caption.copyWith(
+                            color: movie.isMovie ? Colors.blue : Colors.purple,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
+                      ),
                     ],
                   ),
                 ),

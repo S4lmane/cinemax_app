@@ -10,9 +10,9 @@ class VideoSection extends StatelessWidget {
   final List<VideoModel> videos;
 
   const VideoSection({
-    Key? key,
+    super.key,
     required this.videos,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -83,10 +83,9 @@ class _VideoCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const _VideoCard({
-    Key? key,
     required this.video,
     required this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

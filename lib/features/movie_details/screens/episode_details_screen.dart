@@ -14,12 +14,12 @@ class EpisodeDetailsScreen extends StatefulWidget {
   final String tvShowName;
 
   const EpisodeDetailsScreen({
-    Key? key,
+    super.key,
     required this.tvShowId,
     required this.seasonNumber,
     required this.episodeNumber,
     required this.tvShowName,
-  }) : super(key: key);
+  });
 
   @override
   _EpisodeDetailsScreenState createState() => _EpisodeDetailsScreenState();

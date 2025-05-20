@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../theme/app_colors.dart';
 
 class CustomFallbackPoster extends StatelessWidget {
   final String title;
@@ -9,13 +8,13 @@ class CustomFallbackPoster extends StatelessWidget {
   final double borderRadius;
 
   const CustomFallbackPoster({
-    Key? key,
+    super.key,
     required this.title,
     required this.isMovie,
     this.width = 200,
     this.height = 300,
     this.borderRadius = 8.0,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

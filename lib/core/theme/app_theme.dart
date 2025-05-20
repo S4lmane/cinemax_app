@@ -12,7 +12,7 @@ class AppTheme {
       colorScheme: const ColorScheme.dark(
         primary: AppColors.primary,
         secondary: AppColors.primaryDark,
-        background: AppColors.background,
+        surface: AppColors.background,
         error: AppColors.error,
       ),
       appBarTheme: const AppBarTheme(

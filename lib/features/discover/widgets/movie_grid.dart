@@ -16,7 +16,7 @@ class MovieGrid extends StatelessWidget {
   final String emptyMessage;
 
   const MovieGrid({
-    Key? key,
+    super.key,
     required this.movies,
     required this.isLoading,
     this.errorMessage,
@@ -24,7 +24,7 @@ class MovieGrid extends StatelessWidget {
     this.onRetry,
     this.onLoadMore,
     this.emptyMessage = 'No content found',
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

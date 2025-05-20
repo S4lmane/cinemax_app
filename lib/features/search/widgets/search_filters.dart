@@ -17,13 +17,13 @@ class SearchFilters extends StatefulWidget {
   }) onFilterChanged;
 
   const SearchFilters({
-    Key? key,
+    super.key,
     required this.contentType,
     required this.selectedGenre,
     required this.yearRange,
     required this.minRating,
     required this.onFilterChanged,
-  }) : super(key: key);
+  });
 
   @override
   _SearchFiltersState createState() => _SearchFiltersState();
@@ -94,7 +94,7 @@ class _SearchFiltersState extends State<SearchFilters> {
               scrollDirection: Axis.horizontal,
               children: [
                 _buildGenreButton('all', 'All Genres'),
-                ...AppConstants.genres.values.map((genre) => _buildGenreButton(genre, genre)).toList(),
+                ...AppConstants.genres.values.map((genre) => _buildGenreButton(genre, genre)),
               ],
             ),
           ),

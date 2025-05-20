@@ -14,13 +14,13 @@ class MovieActions extends StatefulWidget {
   final MovieModel movie;
 
   const MovieActions({
-    Key? key,
+    super.key,
     required this.isInWatchlist,
     required this.isInFavorites,
     required this.onWatchlistToggle,
     required this.onFavoriteToggle,
     required this.movie,
-  }) : super(key: key);
+  });
 
   @override
   _MovieActionsState createState() => _MovieActionsState();

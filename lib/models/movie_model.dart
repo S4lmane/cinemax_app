@@ -12,10 +12,10 @@ class MovieModel {
   final int voteCount;
   final String releaseDate;
   final List<String> genres;
-  final int runtime;
+  late final int runtime;
   bool isMovie; // true for movie, false for TV show
-  final int? numberOfSeasons; // null for movies
-  final int? numberOfEpisodes; // null for movies
+  late final int? numberOfSeasons; // null for movies
+  late final int? numberOfEpisodes; // null for movies
 
   // New fields for enhanced details
   List<CastModel> cast;

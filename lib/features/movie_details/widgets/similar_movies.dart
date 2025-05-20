@@ -12,10 +12,10 @@ class SimilarMovies extends StatelessWidget {
   final List<MovieModel> movies;
 
   const SimilarMovies({
-    Key? key,
+    super.key,
     required this.title,
     required this.movies,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -71,10 +71,9 @@ class _SimilarMovieCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const _SimilarMovieCard({
-    Key? key,
     required this.movie,
     required this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

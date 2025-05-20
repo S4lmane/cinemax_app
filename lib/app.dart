@@ -12,7 +12,7 @@ import 'shared/navigation/bottom_nav_bar.dart';
 import 'core/widgets/loading_indicator.dart';
 
 class MovieApp extends StatelessWidget {
-  const MovieApp({Key? key}) : super(key: key);
+  const MovieApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +50,7 @@ class MovieApp extends StatelessWidget {
 }
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({Key? key}) : super(key: key);
+  const MainScreen({super.key});
 
   @override
   State<MainScreen> createState() => _MainScreenState();

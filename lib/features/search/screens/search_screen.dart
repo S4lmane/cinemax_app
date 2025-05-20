@@ -8,15 +8,13 @@ import '../../../shared/utils/recent_items_service.dart';
 import '../providers/search_provider.dart';
 import '../widgets/search_bar.dart';
 import '../widgets/search_result_item.dart';
-import '../widgets/filter_chip_group.dart';
 import '../widgets/search_filters.dart';
 import '../../movie_details/screens/movie_details_screen.dart';
 import '../../movie_details/providers/movie_details_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({Key? key}) : super(key: key);
+  const SearchScreen({super.key});
 
   @override
   _SearchScreenState createState() => _SearchScreenState();

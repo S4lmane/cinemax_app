@@ -9,18 +9,16 @@ import '../../../models/list_model.dart';
 import '../providers/list_provider.dart';
 import '../../movie_details/screens/movie_details_screen.dart';
 import '../widgets/list_item.dart';
-import 'dart:math' as math;
 
 class ListScreen extends StatefulWidget {
   final String? listId;
   final ListModel? list; // Optional param if list is already loaded
 
   const ListScreen({
-    Key? key,
+    super.key,
     this.listId,
     this.list,
-  }) : assert(listId != null || list != null),
-        super(key: key);
+  }) : assert(listId != null || list != null);
 
   @override
   _ListScreenState createState() => _ListScreenState();

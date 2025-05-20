@@ -14,7 +14,7 @@ import '../../profile/providers/profile_provider.dart';
 import '../../profile/screens/profile_screen.dart';
 
 class DiscoverScreen extends StatefulWidget {
-  const DiscoverScreen({Key? key}) : super(key: key);
+  const DiscoverScreen({super.key});
 
   @override
   State<DiscoverScreen> createState() => _DiscoverScreenState();

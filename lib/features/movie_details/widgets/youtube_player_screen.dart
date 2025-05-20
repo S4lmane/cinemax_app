@@ -7,10 +7,10 @@ class YouTubePlayerScreen extends StatefulWidget {
   final String title;
 
   const YouTubePlayerScreen({
-    Key? key,
+    super.key,
     required this.videoKey,
     required this.title,
-  }) : super(key: key);
+  });
 
   @override
   _YouTubePlayerScreenState createState() => _YouTubePlayerScreenState();

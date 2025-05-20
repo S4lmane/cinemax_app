@@ -9,10 +9,10 @@ class ProfileHeader extends StatelessWidget {
   final bool isCurrentUser;
 
   const ProfileHeader({
-    Key? key,
+    super.key,
     required this.user,
     this.isCurrentUser = false,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

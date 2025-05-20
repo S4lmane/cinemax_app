@@ -8,11 +8,11 @@ class UserStats extends StatelessWidget {
   final int favoritesCount;
 
   const UserStats({
-    Key? key,
+    super.key,
     required this.listsCount,
     required this.watchlistCount,
     required this.favoritesCount,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

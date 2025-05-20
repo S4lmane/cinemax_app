@@ -14,7 +14,7 @@ class SearchResultItem extends StatelessWidget {
   final VoidCallback onTap;
 
   const SearchResultItem({
-    Key? key,
+    super.key,
     required this.title,
     required this.posterPath,
     required this.voteAverage,
@@ -22,7 +22,7 @@ class SearchResultItem extends StatelessWidget {
     this.overview = '', // Optional with default value
     this.releaseDate = '', // Optional with default value
     required this.onTap,
-  }) : super(key: key);
+  });
 
   String getYear() {
     if (releaseDate.isEmpty) return '';

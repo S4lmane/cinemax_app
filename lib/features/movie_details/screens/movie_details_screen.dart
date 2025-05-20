@@ -21,10 +21,10 @@ class MovieDetailsScreen extends StatefulWidget {
   final bool isMovie;
 
   const MovieDetailsScreen({
-    Key? key,
+    super.key,
     required this.movieId,
     this.isMovie = true,
-  }) : super(key: key);
+  });
 
   @override
   _MovieDetailsScreenState createState() => _MovieDetailsScreenState();
@@ -216,15 +216,13 @@ class _MovieDetailsScreenState extends State<MovieDetailsScreen> {
         }
 
         // Debug prints for movie data
-        if (movie != null) {
-          print('Movie: ${movie.title}');
-          print('Cast: ${movie.cast}');
-          print('Videos: ${movie.videos}');
-          print('Similar: ${movie.similar}');
-          print('Recommendations: ${movie.recommendations}');
-          print('Status: ${movie.status}');
-        }
-
+        print('Movie: ${movie.title}');
+        print('Cast: ${movie.cast}');
+        print('Videos: ${movie.videos}');
+        print('Similar: ${movie.similar}');
+        print('Recommendations: ${movie.recommendations}');
+        print('Status: ${movie.status}');
+      
         final contentTypeColor = movie.isMovie ? Colors.blue : Colors.purple;
         final statusColor = _getStatusColor(movie.getStatusBadge());
         final List<CastModel> cast = movie.cast ?? [];

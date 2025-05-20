@@ -14,11 +14,11 @@ class SeasonDetailsScreen extends StatefulWidget {
   final String tvShowName;
 
   const SeasonDetailsScreen({
-    Key? key,
+    super.key,
     required this.tvShowId,
     required this.seasonNumber,
     required this.tvShowName,
-  }) : super(key: key);
+  });
 
   @override
   _SeasonDetailsScreenState createState() => _SeasonDetailsScreenState();
@@ -167,7 +167,7 @@ class _SeasonDetailsScreenState extends State<SeasonDetailsScreen> {
           style: TextStyles.headline6,
         ),
         const SizedBox(height: 16),
-        ..._season!.episodes.map((episode) => _buildEpisodeItem(episode)).toList(),
+        ..._season!.episodes.map((episode) => _buildEpisodeItem(episode)),
       ],
     );
   }

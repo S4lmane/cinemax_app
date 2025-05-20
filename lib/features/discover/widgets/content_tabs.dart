@@ -7,10 +7,10 @@ class ContentTabs extends StatelessWidget {
   final TabController controller;
 
   const ContentTabs({
-    Key? key,
+    super.key,
     required this.tabs,
     required this.controller,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

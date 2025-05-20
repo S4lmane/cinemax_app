@@ -7,7 +7,6 @@ import '../../../core/theme/text_styles.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../../../core/widgets/error_widget.dart' as app_error;
 import '../providers/profile_provider.dart';
-import '../../auth/providers/auth_provider.dart';
 import '../widgets/profile_header.dart';
 import '../widgets/user_stats.dart';
 import '../widgets/user_lists.dart';
@@ -21,9 +20,9 @@ class ProfileScreen extends StatefulWidget {
   final String? userId;
 
   const ProfileScreen({
-    Key? key,
+    super.key,
     this.userId,
-  }) : super(key: key);
+  });
 
   @override
   _ProfileScreenState createState() => _ProfileScreenState();
@@ -75,13 +74,16 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     });
   }
 
-  void _navigateToMovieDetails(String movieId) {
+  void _navigateToMovieDetails(String movieId, bool isMovie) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => ChangeNotifierProvider(
           create: (_) => MovieDetailsProvider(),
-          child: MovieDetailsScreen(movieId: movieId),
+          child: MovieDetailsScreen(
+            movieId: movieId,
+            isMovie: isMovie,
+          ),
         ),
       ),
     );
@@ -272,7 +274,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     movies: profileProvider.watchlistItems,
                     isCurrentUser: isCurrentUser,
                     isLoading: profileProvider.isLoadingWatchlist,
-                    onMovieTap: _navigateToMovieDetails,
+                    onMovieTap: _navigateToMovieDetails,  // Pass the function directly
                     onRefresh: () => profileProvider.refreshWatchlist(),
                   ),
 
@@ -281,9 +283,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     movies: profileProvider.favoriteItems,
                     isCurrentUser: isCurrentUser,
                     isLoading: profileProvider.isLoadingFavorites,
-                    onMovieTap: _navigateToMovieDetails,
+                    onMovieTap: _navigateToMovieDetails,  // Pass the function directly
                     onRefresh: () => profileProvider.refreshFavorites(),
-                  ),
+                  )
                 ],
               ),
             ),

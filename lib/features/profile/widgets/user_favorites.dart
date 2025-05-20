@@ -1,25 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/movie_model.dart';
 import '../../../core/widgets/loading_indicator.dart';
 import '../../lists/widgets/list_item.dart';
+import '../../movie_details/providers/movie_details_provider.dart';
+import '../../movie_details/screens/movie_details_screen.dart';
 
 class UserFavorites extends StatelessWidget {
   final List<MovieModel> movies;
   final bool isCurrentUser;
   final bool isLoading;
-  final Function(String) onMovieTap;
+  final Function(String, bool) onMovieTap;
   final VoidCallback onRefresh;
 
   const UserFavorites({
-    Key? key,
+    super.key,
     required this.movies,
     required this.isCurrentUser,
     required this.isLoading,
     required this.onMovieTap,
     required this.onRefresh,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +48,7 @@ class UserFavorites extends StatelessWidget {
           final movie = movies[index];
           return ListItem(
             movie: movie,
-            onTap: () => onMovieTap(movie.id),
+            onTap: () => onMovieTap(movie.id, movie.isMovie),
             onRemove: isCurrentUser ? () => _removeFromFavorites(context, movie) : null,
           );
         },
@@ -101,6 +104,21 @@ class UserFavorites extends StatelessWidget {
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+
+  void _navigateToMovieDetails(BuildContext context, MovieModel movie) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChangeNotifierProvider(
+          create: (_) => MovieDetailsProvider(),
+          child: MovieDetailsScreen(
+            movieId: movie.id,
+            isMovie: movie.isMovie, // Pass the correct isMovie flag
+          ),
         ),
       ),
     );

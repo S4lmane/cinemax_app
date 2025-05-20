@@ -8,9 +8,9 @@ class CastList extends StatelessWidget {
   final List<CastModel> cast;
 
   const CastList({
-    Key? key,
+    super.key,
     required this.cast,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -47,9 +47,8 @@ class _CastCard extends StatelessWidget {
   final CastModel castMember;
 
   const _CastCard({
-    Key? key,
     required this.castMember,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

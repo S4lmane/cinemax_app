@@ -12,7 +12,7 @@ class AuthField extends StatefulWidget {
   final IconData? prefixIcon;
 
   const AuthField({
-    Key? key,
+    super.key,
     required this.label,
     this.hintText,
     required this.controller,
@@ -21,7 +21,7 @@ class AuthField extends StatefulWidget {
     this.keyboardType = TextInputType.text,
     this.textInputAction = TextInputAction.next,
     this.prefixIcon,
-  }) : super(key: key);
+  });
 
   @override
   _AuthFieldState createState() => _AuthFieldState();

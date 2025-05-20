@@ -12,28 +12,40 @@ class UserLists extends StatelessWidget {
   final bool isCurrentUser;
 
   const UserLists({
-    Key? key,
+    super.key,
     required this.lists,
     required this.isCurrentUser,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
+    // If lists is empty, show empty state
+    if (lists.isEmpty) {
+      return _buildEmptyState(context);
+    }
+
+    // Filter out any potentially invalid lists
+    final validLists = lists.where((list) =>
+    list.name.isNotEmpty && list.userId.isNotEmpty
+    ).toList();
+
+    if (validLists.isEmpty) {
+      return _buildEmptyState(context);
+    }
+
     return Stack(
       children: [
         // Lists
-        lists.isEmpty
-            ? _buildEmptyState(context)
-            : ListView.builder(
+        ListView.builder(
           padding: EdgeInsets.only(
             top: 16,
             bottom: isCurrentUser ? 80 : 16,
             left: 16,
             right: 16,
           ),
-          itemCount: lists.length,
+          itemCount: validLists.length,
           itemBuilder: (context, index) {
-            final list = lists[index];
+            final list = validLists[index];
             return _buildListItem(context, list);
           },
         ),
@@ -53,7 +65,7 @@ class UserLists extends StatelessWidget {
                 ).then((_) {
                   // Refresh lists after creating a new one
                   Provider.of<ProfileProvider>(context, listen: false)
-                      .initializeUserProfile();
+                      .getUserLists(Provider.of<ProfileProvider>(context, listen: false).userProfile?.uid ?? '');
                 });
               },
               backgroundColor: AppColors.primary,

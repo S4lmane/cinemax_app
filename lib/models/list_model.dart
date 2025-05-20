@@ -78,8 +78,8 @@ class ListModel {
     int? itemCount,
   }) {
     return ListModel(
-      id: this.id,
-      userId: this.userId,
+      id: id,
+      userId: userId,
       name: name ?? this.name,
       description: description ?? this.description,
       coverImageUrl: coverImageUrl ?? this.coverImageUrl,
@@ -87,7 +87,7 @@ class ListModel {
       allowMovies: allowMovies ?? this.allowMovies,
       allowTvShows: allowTvShows ?? this.allowTvShows,
       itemIds: itemIds ?? this.itemIds,
-      createdAt: this.createdAt,
+      createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       itemCount: itemCount ?? this.itemCount,
     );

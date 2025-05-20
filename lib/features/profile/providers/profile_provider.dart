@@ -1,19 +1,19 @@
 import 'dart:io';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/services/user_service.dart';
 import '../../../core/services/movie_service.dart';
-import '../../../core/utils/notification_service.dart';
 import '../../../models/user_model.dart';
 import '../../../models/list_model.dart';
 import '../../../models/movie_model.dart';
+import '../../lists/providers/list_provider.dart';
 
 class ProfileProvider extends ChangeNotifier {
   final UserService _userService = UserService();
   final MovieService _movieService = MovieService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // State variables
   bool _isLoading = false;
@@ -53,23 +53,75 @@ class ProfileProvider extends ChangeNotifier {
     ]);
   }
 
-  // Get user profile
+  // Get user profile with better error handling and user creation if needed
   Future<void> getUserProfile(String uid) async {
     _setLoading(true);
     _clearError();
 
     try {
-      final profile = await _userService.getUserProfile(uid);
+      // Try to get existing profile first
+      var profile = await _userService.getUserProfile(uid);
+
+      // If profile is null, we might need to create it
       if (profile == null) {
-        throw Exception('User profile not found');
+        final User? currentUser = _auth.currentUser;
+        if (currentUser != null) {
+          // Create a basic profile with username derived from email
+          String username = currentUser.email!.split('@')[0];
+          String nickname = username; // Default nickname is the same as username
+
+          await _userService.createUserProfile(
+              uid: currentUser.uid,
+              email: currentUser.email!,
+              username: username,
+              nickname: nickname
+          );
+
+          // Fetch the newly created profile
+          profile = await _userService.getUserProfile(uid);
+        }
       }
+
       _userProfile = profile;
+
+      if (profile == null) {
+        throw Exception('Failed to load or create user profile');
+      }
       print('User profile loaded: ${profile.nickname}, Username: ${profile.username}');
     } catch (e) {
       print('Error getting user profile: $e');
       _setError('Failed to load user profile: $e');
     } finally {
       _setLoading(false);
+    }
+  }
+
+  Future<bool> deleteListAndRefresh(String listId) async {
+    try {
+      final listProvider = ListProvider();
+
+      // Set the current list first
+      final success = await listProvider.getListById(listId);
+      if (!success) {
+        return false;
+      }
+
+      // Delete the list
+      final deleted = await listProvider.deleteList();
+
+      if (deleted) {
+        // Remove the list from local state immediately
+        _userLists.removeWhere((list) => list.id == listId);
+        notifyListeners();
+
+        // Refresh the lists to ensure UI is updated
+        await getUserLists(userProfile?.uid ?? '');
+      }
+
+      return deleted;
+    } catch (e) {
+      print('Error in deleteListAndRefresh: $e');
+      return false;
     }
   }
 
@@ -110,22 +162,14 @@ class ProfileProvider extends ChangeNotifier {
 
       print('Fetching lists for UID: $uid');
 
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('lists')
-          .where('userId', isEqualTo: uid)
-          .get();
+      final lists = await _userService.getUserLists(uid);
+      _userLists = lists;
 
-      print('Retrieved ${querySnapshot.docs.length} lists');
-
-      _userLists = querySnapshot.docs
-          .map((doc) => ListModel.fromMap(doc.data(), doc.id))
-          .toList();
-
-      // Sort lists in memory by updatedAt (avoiding orderBy due to SDK issue)
+      // Sort lists in memory by updatedAt
       _userLists.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     } catch (e) {
-      print('Error getting user lists: $e');
-      _setError('Failed to load user lists: $e');
+      print('Error getting user lists `/Users/Documents/flutter/flutter_project/lib/features/profile/providers/profile_provider.dart lists`');
+      print('Retrieved ${_userLists.length} lists');
     } finally {
       _setLoading(false);
     }
@@ -187,7 +231,7 @@ class ProfileProvider extends ChangeNotifier {
           itemCount: currentItemIds.length,
           updatedAt: DateTime.now(),
         );
-        _notifySafely();
+        notifyListeners();
       }
 
       return true;
@@ -198,10 +242,10 @@ class ProfileProvider extends ChangeNotifier {
     }
   }
 
-  // Get watchlist items
+  // Get watchlist items with better isMovie handling
   Future<void> getWatchlistItems() async {
-    _setLoadingWatchlist(true);
-    _clearError();
+    _isLoadingWatchlist = true;
+    notifyListeners();
 
     try {
       final User? currentUser = _auth.currentUser;
@@ -215,14 +259,15 @@ class ProfileProvider extends ChangeNotifier {
       print('Error getting watchlist items: $e');
       _setError('Failed to load watchlist items: $e');
     } finally {
-      _setLoadingWatchlist(false);
+      _isLoadingWatchlist = false;
+      notifyListeners();
     }
   }
 
   // Get favorite items
   Future<void> getFavoriteItems() async {
-    _setLoadingFavorites(true);
-    _clearError();
+    _isLoadingFavorites = true;
+    notifyListeners();
 
     try {
       final User? currentUser = _auth.currentUser;
@@ -236,7 +281,8 @@ class ProfileProvider extends ChangeNotifier {
       print('Error getting favorite items: $e');
       _setError('Failed to load favorite items: $e');
     } finally {
-      _setLoadingFavorites(false);
+      _isLoadingFavorites = false;
+      notifyListeners();
     }
   }
 
@@ -256,7 +302,7 @@ class ProfileProvider extends ChangeNotifier {
       final success = await _movieService.removeFromWatchlist(movieId);
       if (success) {
         _watchlistItems.removeWhere((movie) => movie.id == movieId);
-        _notifySafely();
+        notifyListeners();
       }
       return success;
     } catch (e) {
@@ -272,7 +318,7 @@ class ProfileProvider extends ChangeNotifier {
       final success = await _movieService.removeFromFavorites(movieId);
       if (success) {
         _favoriteItems.removeWhere((movie) => movie.id == movieId);
-        _notifySafely();
+        notifyListeners();
       }
       return success;
     } catch (e) {
@@ -282,7 +328,7 @@ class ProfileProvider extends ChangeNotifier {
     }
   }
 
-  // Update user profile
+  // Update user profile with better error handling
   Future<bool> updateUserProfile({String? nickname}) async {
     _setLoading(true);
     _clearError();
@@ -309,7 +355,7 @@ class ProfileProvider extends ChangeNotifier {
     }
   }
 
-  // Upload profile image
+  // Upload profile image with robust error handling
   Future<bool> uploadProfileImage(File imageFile) async {
     _setLoading(true);
     _clearError();
@@ -321,26 +367,25 @@ class ProfileProvider extends ChangeNotifier {
       }
 
       print('Uploading profile image for user: ${currentUser.uid}');
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('profile_images/${currentUser.uid}/profile.jpg');
+      final imageUrl = await _userService.uploadProfileImage(
+        currentUser.uid,
+        imageFile,
+      );
 
-      final uploadTask = storageRef.putFile(imageFile);
-      final snapshot = await uploadTask.whenComplete(() {});
-      if (snapshot.state != TaskState.success) {
-        throw Exception('Upload failed: ${snapshot.state}');
+      // Update Firestore document directly to ensure it gets updated
+      await _firestore.collection('users').doc(currentUser.uid).update({
+        'profileImageUrl': imageUrl,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Update local user profile
+      if (_userProfile != null) {
+        _userProfile = _userProfile!.copyWith(
+          profileImageUrl: imageUrl,
+        );
       }
 
-      await Future.delayed(Duration(seconds: 1));
-      final imageUrl = await storageRef.getDownloadURL();
-      print('Profile image uploaded successfully: $imageUrl');
-
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .update({'profileImageUrl': imageUrl});
-
-      await getUserProfile(currentUser.uid);
+      notifyListeners();
       return true;
     } catch (e) {
       print('Error uploading profile image: $e');
@@ -351,7 +396,7 @@ class ProfileProvider extends ChangeNotifier {
     }
   }
 
-  // Upload banner image
+  // Upload banner image with robust error handling
   Future<bool> uploadBannerImage(File imageFile) async {
     _setLoading(true);
     _clearError();
@@ -363,26 +408,25 @@ class ProfileProvider extends ChangeNotifier {
       }
 
       print('Uploading banner image for user: ${currentUser.uid}');
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('banner_images/${currentUser.uid}/banner.jpg');
+      final imageUrl = await _userService.uploadBannerImage(
+        currentUser.uid,
+        imageFile,
+      );
 
-      final uploadTask = storageRef.putFile(imageFile);
-      final snapshot = await uploadTask.whenComplete(() {});
-      if (snapshot.state != TaskState.success) {
-        throw Exception('Upload failed: ${snapshot.state}');
+      // Update Firestore document directly to ensure it gets updated
+      await _firestore.collection('users').doc(currentUser.uid).update({
+        'bannerImageUrl': imageUrl,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Update local user profile
+      if (_userProfile != null) {
+        _userProfile = _userProfile!.copyWith(
+          bannerImageUrl: imageUrl,
+        );
       }
 
-      await Future.delayed(Duration(seconds: 1));
-      final imageUrl = await storageRef.getDownloadURL();
-      print('Banner image uploaded successfully: $imageUrl');
-
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .update({'bannerImageUrl': imageUrl});
-
-      await getUserProfile(currentUser.uid);
+      notifyListeners();
       return true;
     } catch (e) {
       print('Error uploading banner image: $e');
@@ -393,7 +437,7 @@ class ProfileProvider extends ChangeNotifier {
     }
   }
 
-  // Upload list cover image
+  // Upload list cover image with direct Firestore update
   Future<bool> uploadListCoverImage(String listId, File imageFile) async {
     _setLoading(true);
     _clearError();
@@ -405,35 +449,30 @@ class ProfileProvider extends ChangeNotifier {
       }
 
       print('Uploading list cover image for user: ${currentUser.uid}, list: $listId');
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('list_covers/${currentUser.uid}/$listId.jpg');
+      final storageService = await _userService.getStorageService();
+      final imageUrl = await storageService.uploadListCoverImage(
+        currentUser.uid,
+        listId,
+        imageFile,
+      );
 
-      final uploadTask = storageRef.putFile(imageFile);
-      final snapshot = await uploadTask.whenComplete(() {});
-      if (snapshot.state != TaskState.success) {
-        throw Exception('Upload failed: ${snapshot.state}');
-      }
-
-      await Future.delayed(Duration(seconds: 1));
-      final imageUrl = await storageRef.getDownloadURL();
-      print('List cover image uploaded successfully: $imageUrl');
-
-      await FirebaseFirestore.instance
+      // Update list cover in Firestore directly
+      await _firestore
           .collection('lists')
           .doc(listId)
           .update({
         'coverImageUrl': imageUrl,
-        'updatedAt': Timestamp.fromDate(DateTime.now()),
+        'updatedAt': FieldValue.serverTimestamp(),
       });
 
+      // Update local list data
       final index = _userLists.indexWhere((list) => list.id == listId);
       if (index != -1) {
         _userLists[index] = _userLists[index].copyWith(
           coverImageUrl: imageUrl,
           updatedAt: DateTime.now(),
         );
-        _notifySafely();
+        notifyListeners();
       }
 
       return true;
@@ -518,27 +557,27 @@ class ProfileProvider extends ChangeNotifier {
   // Helper methods
   void _setLoading(bool value) {
     _isLoading = value;
-    _notifySafely();
+    notifyListeners();
   }
 
   void _setLoadingWatchlist(bool value) {
     _isLoadingWatchlist = value;
-    _notifySafely();
+    notifyListeners();
   }
 
   void _setLoadingFavorites(bool value) {
     _isLoadingFavorites = value;
-    _notifySafely();
+    notifyListeners();
   }
 
   void _setError(String error) {
     _error = error;
-    _notifySafely();
+    notifyListeners();
   }
 
   void _clearError() {
     _error = null;
-    _notifySafely();
+    notifyListeners();
   }
 
   void _notifySafely() {
@@ -557,6 +596,6 @@ class ProfileProvider extends ChangeNotifier {
     _isLoading = false;
     _isLoadingWatchlist = false;
     _isLoadingFavorites = false;
-    _notifySafely();
+    notifyListeners();
   }
 }

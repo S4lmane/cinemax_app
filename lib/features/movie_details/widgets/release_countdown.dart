@@ -7,9 +7,9 @@ class ReleaseCountdown extends StatefulWidget {
   final DateTime releaseDate;
 
   const ReleaseCountdown({
-    Key? key,
+    super.key,
     required this.releaseDate,
-  }) : super(key: key);
+  });
 
   @override
   _ReleaseCountdownState createState() => _ReleaseCountdownState();

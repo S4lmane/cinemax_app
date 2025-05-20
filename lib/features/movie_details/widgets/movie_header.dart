@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/text_styles.dart';
 import '../../../models/movie_model.dart';
 import '../../../core/widgets/custom_image.dart';
@@ -9,10 +8,10 @@ class MovieHeader extends StatelessWidget {
   final VoidCallback onPosterTap;
 
   const MovieHeader({
-    Key? key,
+    super.key,
     required this.movie,
     required this.onPosterTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

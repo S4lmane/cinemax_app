@@ -771,7 +771,8 @@ class MovieService {
         final Map<String, dynamic> data = json.decode(response.body);
         final movie = MovieModel.fromMap(data);
 
-        // Set isMovie flag
+        // Always explicitly set isMovie flag based on the input parameter
+        // This is critical for handling TV shows correctly
         movie.isMovie = isMovie;
 
         // Parse credits to get cast and crew
@@ -868,7 +869,7 @@ class MovieService {
             movie.similar = movie.similar.sublist(0, 15);
           }
 
-          // Set isMovie flag for similar items
+          // Set isMovie flag for similar items - CRITICAL for proper display
           for (var item in movie.similar) {
             item.isMovie = isMovie;
           }
@@ -900,7 +901,7 @@ class MovieService {
                   .map((item) => MovieModel.fromMap(item))
                   .toList();
 
-              // Add to similar list
+              // Add to similar list and ensure correct content type flag
               for (var item in additionalSimilar) {
                 item.isMovie = isMovie;
               }
@@ -933,7 +934,7 @@ class MovieService {
             movie.recommendations = movie.recommendations.sublist(0, 15);
           }
 
-          // Set isMovie flag for recommendations
+          // Set isMovie flag for recommendations - CRITICAL for proper display
           for (var item in movie.recommendations) {
             item.isMovie = isMovie;
           }
@@ -964,7 +965,7 @@ class MovieService {
                     .map((item) => MovieModel.fromMap(item))
                     .toList();
 
-                // Add to recommendations list
+                // Add to recommendations list and ensure correct content type flag
                 for (var item in additionalRecs) {
                   item.isMovie = isMovie;
                 }
@@ -982,9 +983,36 @@ class MovieService {
           }
         }
 
+        // Handle TV-specific details
+        if (!isMovie) {
+          try {
+            // Extract number of seasons and episodes
+            if (data.containsKey('number_of_seasons')) {
+              movie.numberOfSeasons = data['number_of_seasons'];
+            }
+            if (data.containsKey('number_of_episodes')) {
+              movie.numberOfEpisodes = data['number_of_episodes'];
+            }
+
+            // Get status information
+            if (data.containsKey('status')) {
+              movie.status = data['status'];
+            }
+
+            // Get episode runtime
+            if (data.containsKey('episode_run_time') &&
+                data['episode_run_time'] is List &&
+                (data['episode_run_time'] as List).isNotEmpty) {
+              movie.runtime = (data['episode_run_time'] as List).first;
+            }
+          } catch (e) {
+            print('Error processing TV-specific details: $e');
+          }
+        }
+
         return movie;
       } else {
-        throw Exception('Failed to load item details');
+        throw Exception('Failed to load item details - status code: ${response.statusCode}');
       }
     } catch (e) {
       print('Error fetching item details: $e');
@@ -1260,9 +1288,11 @@ class MovieService {
         final futures = batch.map((doc) async {
           final data = doc.data();
           final itemId = data['itemId'] as String;
-          // final isMovie = data['isMovie'] as bool;
+
+          // Important: Get the isMovie flag from Firestore
           final isMovie = data['isMovie'] as bool? ?? true;
 
+          // Get details from API based on correct content type
           final item = await getMovieDetails(itemId, isMovie: isMovie);
           return item;
         }).toList();
@@ -1388,9 +1418,11 @@ class MovieService {
         final futures = batch.map((doc) async {
           final data = doc.data();
           final itemId = data['itemId'] as String;
-          // final isMovie = data['isMovie'] as bool;
+
+          // Important: Get the isMovie flag from Firestore
           final isMovie = data['isMovie'] as bool? ?? true;
 
+          // Get details from API based on correct content type
           final item = await getMovieDetails(itemId, isMovie: isMovie);
           return item;
         }).toList();

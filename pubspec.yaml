@@ -75,6 +75,7 @@ dependencies:
   #flutter pub add flutter_inappwebview:^6.0.0
   #flutter pub add youtube_player_flutter:^9.0.4
 
+  path: any
 dev_dependencies:
   flutter_test:
     sdk: flutter

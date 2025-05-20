@@ -9,12 +9,12 @@ class FilterChipGroup extends StatelessWidget {
   final Function(String) onSelected;
 
   const FilterChipGroup({
-    Key? key,
+    super.key,
     required this.label,
     required this.options,
     required this.selectedValue,
     required this.onSelected,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

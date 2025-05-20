@@ -8,9 +8,9 @@ class FullscreenPosterScreen extends StatelessWidget {
   final String posterUrl;
 
   const FullscreenPosterScreen({
-    Key? key,
+    super.key,
     required this.posterUrl,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

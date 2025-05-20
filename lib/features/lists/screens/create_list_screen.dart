@@ -8,7 +8,7 @@ import '../../profile/providers/profile_provider.dart';
 import 'list_screen.dart';
 
 class CreateListScreen extends StatefulWidget {
-  const CreateListScreen({Key? key}) : super(key: key);
+  const CreateListScreen({super.key});
 
   @override
   _CreateListScreenState createState() => _CreateListScreenState();

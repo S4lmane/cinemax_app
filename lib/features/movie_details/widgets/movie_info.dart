@@ -9,9 +9,9 @@ class MovieInfo extends StatelessWidget {
   final MovieModel movie;
 
   const MovieInfo({
-    Key? key,
+    super.key,
     required this.movie,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

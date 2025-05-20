@@ -67,15 +67,15 @@ class UserModel {
     DateTime? lastLoginAt,
   }) {
     return UserModel(
-      uid: this.uid,
-      email: this.email,
-      username: this.username,
+      uid: uid,
+      email: email,
+      username: username,
       nickname: nickname ?? this.nickname,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       bannerImageUrl: bannerImageUrl ?? this.bannerImageUrl,
       isModerator: isModerator ?? this.isModerator,
       isVerified: isVerified ?? this.isVerified,
-      createdAt: this.createdAt,
+      createdAt: createdAt,
       lastLoginAt: lastLoginAt ?? this.lastLoginAt,
     );
   }

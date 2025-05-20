@@ -15,7 +15,7 @@ class CustomImage extends StatelessWidget {
   final bool isPoster;
 
   const CustomImage({
-    Key? key,
+    super.key,
     required this.imageUrl,
     this.width = double.infinity,
     this.height = double.infinity,
@@ -24,7 +24,7 @@ class CustomImage extends StatelessWidget {
     this.title = 'No Title',
     this.isMovie = true,
     this.isPoster = false,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
