@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/loading_indicator.dart';
-import '../../../core/widgets/error_widget.dart' as app_error;  
+import '../../../core/widgets/error_widget.dart' as app_error;
 import '../../../models/person_details.dart';
 import '../../../models/person_credits.dart';
 import '../providers/people_provider.dart';
 import '../../movie_details/screens/movie_details_screen.dart';
+import '../../movie_details/providers/movie_details_provider.dart';
 import '../widgets/award_chip.dart';
 
 class PersonDetailScreen extends StatefulWidget {
@@ -192,6 +193,21 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
         ),
         onPressed: () => Navigator.pop(context),
       ),
+      actions: [
+        IconButton(
+          icon: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.cardBackground.withOpacity(0.5),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.home, color: Colors.white),
+          ),
+          onPressed: () {
+            Navigator.of(context).popUntil((route) => route.isFirst);
+          },
+        ),
+      ],
     );
   }
 
@@ -245,7 +261,14 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
                   person.knownForDepartment!,
                   style: const TextStyle(color: AppColors.primary),
                 ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  side: BorderSide(
+                    color: AppColors.primary,
+                  ),
+                ),
               ),
+
               const SizedBox(width: 8),
             ],
             if (person.placeOfBirth != null) ...[
@@ -396,11 +419,16 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
             final work = items[index];
             return GestureDetector(
               onTap: () {
+                // Navigate to movie details with proper provider setup
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => MovieDetailsScreen(
-                      movieId: work.id,
+                    builder: (context) => ChangeNotifierProvider(
+                      create: (_) => MovieDetailsProvider(),
+                      child: MovieDetailsScreen(
+                        movieId: work.id.toString(),
+                        isMovie: work.mediaType == 'movie' || work.title != null,
+                      ),
                     ),
                   ),
                 );

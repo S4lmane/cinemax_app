@@ -9,6 +9,7 @@ import 'features/discover/providers/discover_provider.dart';
 import 'features/discover/providers/movies_provider.dart';
 import 'features/discover/providers/search_provider.dart';
 import 'features/lists/providers/list_provider.dart';
+import 'features/people/providers/people_provider.dart';
 import 'features/profile/providers/profile_provider.dart';
 
 void main() async {
@@ -40,6 +41,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => ProfileProvider()),
         ChangeNotifierProvider(create: (_) => DiscoverProvider()),
         ChangeNotifierProvider(create: (_) => ListProvider()),
+        ChangeNotifierProvider(create: (_) => PeopleProvider()),
       ],
       child: const MovieApp(),
     ),
