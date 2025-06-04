@@ -12,151 +12,170 @@ class StorageService {
     try {
       debugPrint('Uploading profile image for user: $userId');
 
-      // Generate unique file name
-      final fileExtension = path.extension(imageFile.path);
-      final fileName = '${userId}_${_uuid.v4()}$fileExtension';
-
-      // IMPORTANT: Use the direct path that matches your storage rules
-      // Change to match your rules exactly
-      final storageRef = _storage.ref()
-          .child('users') // Changed from AppConstants.profileImagesPath
-          .child(userId)
-          .child(fileName);
-
-      debugPrint('Uploading profile image to path: ${storageRef.fullPath}');
-
-      // Make sure the file is valid
+      // Validate file
       if (!await imageFile.exists()) {
         throw Exception('Image file does not exist');
       }
 
-      // Get file size to verify it's not empty
       final fileSize = await imageFile.length();
       if (fileSize <= 0) {
         throw Exception('Image file is empty');
       }
 
-      // Upload file with proper content type
-      final uploadTask = storageRef.putFile(
-        imageFile,
-        SettableMetadata(contentType: 'image/${fileExtension.substring(1)}'),
+      // Generate unique file name with proper extension
+      final fileExtension = path.extension(imageFile.path).toLowerCase();
+      if (fileExtension.isEmpty) {
+        throw Exception('Invalid file extension');
+      }
+
+      final fileName = 'profile_${DateTime.now().millisecondsSinceEpoch}$fileExtension';
+
+      // Use storage path that matches Firebase Storage rules
+      final storageRef = _storage.ref().child('users/$userId/images/$fileName');
+
+      debugPrint('Uploading to path: ${storageRef.fullPath}');
+
+      // Set proper metadata
+      final metadata = SettableMetadata(
+        contentType: _getContentType(fileExtension),
+        customMetadata: {
+          'uploadedBy': userId,
+          'uploadedAt': DateTime.now().toIso8601String(),
+        },
       );
 
-      // Track upload progress (optional)
+      // Upload with retry logic
+      final uploadTask = storageRef.putFile(imageFile, metadata);
+
+      // Monitor upload progress
       uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
-        final progress =
-            (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        debugPrint('Upload progress: $progress%');
+        final progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        debugPrint('Upload progress: ${progress.toStringAsFixed(1)}%');
       });
 
-      // Get download URL once complete
+      // Wait for completion
       final snapshot = await uploadTask;
-      final imageUrl = await snapshot.ref.getDownloadURL();
+      final downloadUrl = await snapshot.ref.getDownloadURL();
 
-      debugPrint('Upload successful! URL: $imageUrl');
-      return imageUrl;
+      debugPrint('Profile image upload successful! URL: $downloadUrl');
+      return downloadUrl;
     } catch (e) {
       debugPrint('Error uploading profile image: $e');
       throw Exception('Failed to upload profile image: $e');
     }
   }
 
-  // Upload banner image
   Future<String> uploadBannerImage(String userId, File imageFile) async {
     try {
       debugPrint('Uploading banner image for user: $userId');
 
-      // Generate unique file name
-      final fileExtension = path.extension(imageFile.path);
-      final fileName = '${userId}_${_uuid.v4()}$fileExtension';
-
-      // IMPORTANT: Use the direct path that matches your storage rules
-      final storageRef = _storage.ref()
-          .child('users') // Changed from AppConstants.bannerImagesPath
-          .child(userId)
-          .child('banner') // Add subfolder for organization
-          .child(fileName);
-
-      debugPrint('Uploading banner image to path: ${storageRef.fullPath}');
-
-      // Make sure the file is valid
+      // Validate file
       if (!await imageFile.exists()) {
         throw Exception('Image file does not exist');
       }
 
-      // Get file size to verify it's not empty
       final fileSize = await imageFile.length();
       if (fileSize <= 0) {
         throw Exception('Image file is empty');
       }
 
-      // Upload file with proper content type
-      final uploadTask = storageRef.putFile(
-        imageFile,
-        SettableMetadata(contentType: 'image/${fileExtension.substring(1)}'),
+      // Generate unique file name with proper extension
+      final fileExtension = path.extension(imageFile.path).toLowerCase();
+      if (fileExtension.isEmpty) {
+        throw Exception('Invalid file extension');
+      }
+
+      final fileName = 'banner_${DateTime.now().millisecondsSinceEpoch}$fileExtension';
+
+      // Use storage path that matches Firebase Storage rules
+      final storageRef = _storage.ref().child('users/$userId/images/$fileName');
+
+      debugPrint('Uploading to path: ${storageRef.fullPath}');
+
+      // Set proper metadata
+      final metadata = SettableMetadata(
+        contentType: _getContentType(fileExtension),
+        customMetadata: {
+          'uploadedBy': userId,
+          'uploadedAt': DateTime.now().toIso8601String(),
+          'imageType': 'banner',
+        },
       );
 
-      // Track upload progress (optional)
+      // Upload with retry logic
+      final uploadTask = storageRef.putFile(imageFile, metadata);
+
+      // Monitor upload progress
       uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
-        final progress =
-            (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        debugPrint('Upload progress: $progress%');
+        final progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        debugPrint('Upload progress: ${progress.toStringAsFixed(1)}%');
       });
 
-      // Get download URL once complete
+      // Wait for completion
       final snapshot = await uploadTask;
-      final imageUrl = await snapshot.ref.getDownloadURL();
+      final downloadUrl = await snapshot.ref.getDownloadURL();
 
-      debugPrint('Upload successful! URL: $imageUrl');
-      return imageUrl;
+      debugPrint('Banner image upload successful! URL: $downloadUrl');
+      return downloadUrl;
     } catch (e) {
       debugPrint('Error uploading banner image: $e');
       throw Exception('Failed to upload banner image: $e');
     }
   }
 
-  // Upload list cover image
   Future<String> uploadListCoverImage(String userId, String listId, File imageFile) async {
     try {
       debugPrint('Uploading list cover image - User: $userId, List: $listId');
 
-      // Generate unique file name
-      final fileExtension = path.extension(imageFile.path);
-      final fileName = '${listId}_${_uuid.v4()}$fileExtension';
-
-      // IMPORTANT: Use the direct path that matches your storage rules
-      final storageRef = _storage.ref()
-          .child('users') // Changed from AppConstants.listCoversPath
-          .child(userId)
-          .child('lists')
-          .child(listId)
-          .child('cover$fileExtension');
-
-      debugPrint('Uploading list cover to path: ${storageRef.fullPath}');
-
-      // Make sure the file is valid
+      // Validate file
       if (!await imageFile.exists()) {
         throw Exception('Image file does not exist');
       }
 
-      // Get file size to verify it's not empty
       final fileSize = await imageFile.length();
       if (fileSize <= 0) {
         throw Exception('Image file is empty');
       }
 
-      // Upload file with proper content type
-      final uploadTask = storageRef.putFile(
-        imageFile,
-        SettableMetadata(contentType: 'image/${fileExtension.substring(1)}'),
+      // Generate unique file name with proper extension
+      final fileExtension = path.extension(imageFile.path).toLowerCase();
+      if (fileExtension.isEmpty) {
+        throw Exception('Invalid file extension');
+      }
+
+      final fileName = 'cover_${DateTime.now().millisecondsSinceEpoch}$fileExtension';
+
+      // Use storage path that matches Firebase Storage rules
+      final storageRef = _storage.ref().child('users/$userId/lists/$listId/$fileName');
+
+      debugPrint('Uploading to path: ${storageRef.fullPath}');
+
+      // Set proper metadata
+      final metadata = SettableMetadata(
+        contentType: _getContentType(fileExtension),
+        customMetadata: {
+          'uploadedBy': userId,
+          'uploadedAt': DateTime.now().toIso8601String(),
+          'listId': listId,
+          'imageType': 'cover',
+        },
       );
 
-      // Get download URL once complete
-      final snapshot = await uploadTask;
-      final imageUrl = await snapshot.ref.getDownloadURL();
+      // Upload with retry logic
+      final uploadTask = storageRef.putFile(imageFile, metadata);
 
-      debugPrint('Upload successful! URL: $imageUrl');
-      return imageUrl;
+      // Monitor upload progress
+      uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
+        final progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        debugPrint('Upload progress: ${progress.toStringAsFixed(1)}%');
+      });
+
+      // Wait for completion
+      final snapshot = await uploadTask;
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+
+      debugPrint('List cover upload successful! URL: $downloadUrl');
+      return downloadUrl;
     } catch (e) {
       debugPrint('Error uploading list cover image: $e');
       throw Exception('Failed to upload list cover image: $e');
@@ -167,6 +186,7 @@ class StorageService {
   Future<void> deleteImage(String imageUrl) async {
     try {
       if (imageUrl.isEmpty) {
+        debugPrint('No image URL provided for deletion');
         return;
       }
 
@@ -178,8 +198,77 @@ class StorageService {
 
       debugPrint('Image deleted successfully');
     } catch (e) {
-      debugPrint('Error deleting image: $e');
-      // Don't throw error if deletion fails
+      debugPrint('Error deleting image (non-critical): $e');
+      // Don't throw error if deletion fails - it's not critical
+    }
+  }
+
+  // Helper method to get proper content type
+  String _getContentType(String fileExtension) {
+    switch (fileExtension.toLowerCase()) {
+      case '.jpg':
+      case '.jpeg':
+        return 'image/jpeg';
+      case '.png':
+        return 'image/png';
+      case '.gif':
+        return 'image/gif';
+      case '.webp':
+        return 'image/webp';
+      case '.bmp':
+        return 'image/bmp';
+      default:
+        return 'image/jpeg'; // Default fallback
+    }
+  }
+
+  // Helper method to validate image file
+  bool _isValidImageFile(String filePath) {
+    final validExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
+    final fileExtension = path.extension(filePath).toLowerCase();
+    return validExtensions.contains(fileExtension);
+  }
+
+  // Get file size in MB for validation
+  Future<double> getFileSizeInMB(File file) async {
+    try {
+      final bytes = await file.length();
+      return bytes / (1024 * 1024);
+    } catch (e) {
+      debugPrint('Error getting file size: $e');
+      return 0.0;
+    }
+  }
+
+  // Validate image file before upload
+  Future<bool> validateImageFile(File imageFile, {double maxSizeMB = 10.0}) async {
+    try {
+      // Check if file exists
+      if (!await imageFile.exists()) {
+        throw Exception('File does not exist');
+      }
+
+      // Check file extension
+      if (!_isValidImageFile(imageFile.path)) {
+        throw Exception('Invalid image file type');
+      }
+
+      // Check file size
+      final sizeInMB = await getFileSizeInMB(imageFile);
+      if (sizeInMB > maxSizeMB) {
+        throw Exception('File size exceeds ${maxSizeMB}MB limit');
+      }
+
+      // Check if file is readable
+      final fileSize = await imageFile.length();
+      if (fileSize <= 0) {
+        throw Exception('File is empty');
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('Image validation failed: $e');
+      return false;
     }
   }
 }

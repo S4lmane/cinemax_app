@@ -7,6 +7,7 @@ import '../../../core/widgets/loading_indicator.dart';
 import '../../../core/widgets/error_widget.dart' as app_error;
 import '../../../models/list_model.dart';
 import '../providers/list_provider.dart';
+import '../../movie_details/providers/movie_details_provider.dart';
 import '../../movie_details/screens/movie_details_screen.dart';
 import '../widgets/list_item.dart';
 
@@ -114,11 +115,17 @@ class _ListScreenState extends State<ListScreen> {
     );
   }
 
-  void _navigateToMovieDetails(String movieId) {
+  void _navigateToMovieDetails(String movieId, bool isMovie) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => MovieDetailsScreen(movieId: movieId),
+        builder: (context) => ChangeNotifierProvider(
+          create: (_) => MovieDetailsProvider(),
+          child: MovieDetailsScreen(
+            movieId: movieId,
+            isMovie: isMovie,
+          ),
+        ),
       ),
     );
   }
@@ -202,6 +209,18 @@ class _ListScreenState extends State<ListScreen> {
                           ? Image.network(
                         list.coverImageUrl,
                         fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.blue.shade700,
+                                Colors.purple.shade500,
+                              ],
+                            ),
+                          ),
+                        ),
                       )
                           : Container(
                         decoration: BoxDecoration(
@@ -395,7 +414,7 @@ class _ListScreenState extends State<ListScreen> {
                       final movie = listItems[index];
                       return ListItem(
                         movie: movie,
-                        onTap: () => _navigateToMovieDetails(movie.id),
+                        onTap: () => _navigateToMovieDetails(movie.id, movie.isMovie),
                         onRemove: isOwner
                             ? () => listProvider.removeItemFromList(movie.id)
                             : null,

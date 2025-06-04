@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/services/storage_service.dart';
 import '../../../core/services/movie_service.dart';
+import '../../../core/services/user_service.dart';
 import '../../../models/list_model.dart';
 import '../../../models/movie_model.dart';
 
@@ -12,6 +13,7 @@ class ListProvider extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final StorageService _storageService = StorageService();
   final MovieService _movieService = MovieService();
+  final UserService _userService = UserService();
 
   bool _isLoading = false;
   String? _error;
@@ -44,52 +46,42 @@ class ListProvider extends ChangeNotifier {
         return null;
       }
 
-      final userId = currentUser.uid;
-      final now = DateTime.now();
+      debugPrint('Creating new list: $name for user: ${currentUser.uid}');
 
-      // IMPORTANT: Make sure userId field is included and matches current user
-      final listData = {
-        'userId': userId,  // Critical field for security rules
-        'name': name,
-        'description': description,
-        'coverImageUrl': '',
-        'isPublic': isPublic,
-        'allowMovies': allowMovies,
-        'allowTvShows': allowTvShows,
-        'itemIds': [],
-        'createdAt': now,
-        'updatedAt': now,
-        'itemCount': 0,
-      };
+      // Use UserService to create the list
+      final newList = await _userService.createList(
+        name: name,
+        description: description,
+        isPublic: isPublic,
+        allowMovies: allowMovies,
+        allowTvShows: allowTvShows,
+      );
 
-      // Debug info about the list being created
-      debugPrint('Creating new list: $name for user: $userId');
+      if (newList == null) {
+        _setError('Failed to create list');
+        return null;
+      }
 
-      // Add to Firestore - Try DIRECT string paths instead of constants
-      // This ensures exact match with security rules
-      final listRef = await _firestore
-          .collection('users')  // Direct string instead of constant
-          .doc(userId)
-          .collection('lists')  // Direct string instead of constant
-          .add(listData);
+      debugPrint('List created with ID: ${newList.id}');
 
-      debugPrint('List created with ID: ${listRef.id}');
+      // Set as current list
+      _currentList = newList;
 
       // If cover image is provided, upload it
       if (coverImage != null) {
         try {
           final imageUrl = await _storageService.uploadListCoverImage(
-            userId,
-            listRef.id,
+            currentUser.uid,
+            newList.id,
             coverImage,
           );
 
-          // Update list with cover image URL
-          await listRef.update({
-            'coverImageUrl': imageUrl,
-          });
+          // Update list with cover image URL using UserService
+          await _userService.updateListCover(currentUser.uid, newList.id, imageUrl);
 
-          listData['coverImageUrl'] = imageUrl;
+          // Update local list model
+          _currentList = _currentList!.copyWith(coverImageUrl: imageUrl);
+
           debugPrint('Cover image added to list: $imageUrl');
         } catch (e) {
           debugPrint('Error uploading cover image, continuing without image: $e');
@@ -97,11 +89,8 @@ class ListProvider extends ChangeNotifier {
         }
       }
 
-      // Create list model and set as current list
-      _currentList = ListModel.fromMap(listData, listRef.id);
-
       _setLoading(false);
-      return listRef.id;
+      return newList.id;
     } catch (e) {
       debugPrint('Error creating list: $e');
       _setError('Failed to create list: $e');
@@ -123,13 +112,13 @@ class ListProvider extends ChangeNotifier {
 
       debugPrint('Getting list: $listId for user: ${currentUser.uid}');
 
-      // IMPORTANT: First try direct path to the list using current user's ID
+      // First try direct path to the list using current user's ID
       DocumentSnapshot? listDoc;
       try {
         listDoc = await _firestore
-            .collection('users')  // Direct string instead of constant
+            .collection('users')
             .doc(currentUser.uid)
-            .collection('lists')  // Direct string instead of constant
+            .collection('lists')
             .doc(listId)
             .get();
 
@@ -143,7 +132,7 @@ class ListProvider extends ChangeNotifier {
         debugPrint('List not found in user\'s lists, trying collection group query');
 
         final querySnapshot = await _firestore
-            .collectionGroup('lists')  // Direct string instead of constant
+            .collectionGroup('lists')
             .where(FieldPath.documentId, isEqualTo: listId)
             .limit(1)
             .get();
@@ -221,7 +210,6 @@ class ListProvider extends ChangeNotifier {
       final itemIds = _currentList!.itemIds;
       _listItems = [];
 
-      // Add extra logging
       debugPrint('ItemIds from list document: $itemIds');
       debugPrint('Item count: ${itemIds.length}');
 
@@ -240,10 +228,14 @@ class ListProvider extends ChangeNotifier {
         // Fetch movies/TV shows in parallel
         final futures = batch.map((id) async {
           try {
-            final movie = await _movieService.getMovieDetails(id);
+            // Try to get as movie first, then as TV show
+            var movie = await _movieService.getMovieDetails(id, isMovie: true);
+            if (movie == null) {
+              movie = await _movieService.getMovieDetails(id, isMovie: false);
+            }
             return movie;
           } catch (e) {
-            debugPrint('Error fetching movie $id: $e');
+            debugPrint('Error fetching item $id: $e');
             return null;
           }
         }).toList();
@@ -312,56 +304,19 @@ class ListProvider extends ChangeNotifier {
         return false;
       }
 
-      // Use DIRECT string paths for collection references
-      final listRef = _firestore
-          .collection('users')  // Direct string instead of constant
-          .doc(currentUser.uid)
-          .collection('lists')  // Direct string instead of constant
-          .doc(_currentList!.id);
+      // Use UserService to add the item
+      final success = await _userService.addItemToList(
+        listId: _currentList!.id,
+        itemId: itemId,
+        isMovie: isMovie,
+      );
 
-      // IMPORTANT: Use a transaction for atomic operations
-      debugPrint('Starting transaction to add item');
+      if (!success) {
+        _setError('Failed to add item to list');
+        return false;
+      }
 
-      await _firestore.runTransaction((transaction) async {
-        // Get fresh list data to ensure we're working with current version
-        final listSnapshot = await transaction.get(listRef);
-
-        if (!listSnapshot.exists) {
-          debugPrint('List does not exist in transaction');
-          throw Exception('List not found');
-        }
-
-        // Get current data including itemIds
-        final data = listSnapshot.data() as Map<String, dynamic>;
-        final List<dynamic> currentItemIds = List<dynamic>.from(data['itemIds'] ?? []);
-
-        // Skip if already in list
-        if (currentItemIds.contains(itemId)) {
-          debugPrint('Item already in list (detected in transaction)');
-          return; // Exit transaction without error
-        }
-
-        // Update the list document
-        transaction.update(listRef, {
-          'itemIds': FieldValue.arrayUnion([itemId]),
-          'itemCount': FieldValue.increment(1),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-
-        debugPrint('List document updated in transaction');
-
-        // Add to items subcollection
-        final itemRef = listRef.collection('items').doc();
-        transaction.set(itemRef, {
-          'itemId': itemId,
-          'isMovie': isMovie,
-          'addedAt': FieldValue.serverTimestamp(),
-        });
-
-        debugPrint('Item added to subcollection in transaction');
-      });
-
-      debugPrint('Transaction completed successfully');
+      debugPrint('Item added successfully');
 
       // Update local list model
       final updatedItemIds = [..._currentList!.itemIds, itemId];
@@ -373,7 +328,7 @@ class ListProvider extends ChangeNotifier {
 
       // Get the movie details and add to list items
       try {
-        final movie = await _movieService.getMovieDetails(itemId);
+        final movie = await _movieService.getMovieDetails(itemId, isMovie: isMovie);
         if (movie != null) {
           _listItems.add(movie);
           debugPrint('Added movie to list items: ${movie.title}');
@@ -419,51 +374,18 @@ class ListProvider extends ChangeNotifier {
         return false;
       }
 
-      // Use DIRECT string paths for collection references
-      final listRef = _firestore
-          .collection('users')  // Direct string instead of constant
-          .doc(currentUser.uid)
-          .collection('lists')  // Direct string instead of constant
-          .doc(_currentList!.id);
+      // Use UserService to remove the item
+      final success = await _userService.removeItemFromList(
+        listId: _currentList!.id,
+        itemId: itemId,
+      );
 
-      // IMPORTANT: Use a transaction for atomic operations
-      debugPrint('Starting transaction to remove item');
+      if (!success) {
+        _setError('Failed to remove item from list');
+        return false;
+      }
 
-      await _firestore.runTransaction((transaction) async {
-        // First get the list to verify it exists
-        final listSnapshot = await transaction.get(listRef);
-
-        if (!listSnapshot.exists) {
-          debugPrint('List does not exist in transaction');
-          throw Exception('List not found');
-        }
-
-        // Update the list document
-        transaction.update(listRef, {
-          'itemIds': FieldValue.arrayRemove([itemId]),
-          'itemCount': FieldValue.increment(-1),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
-
-        debugPrint('List document updated in transaction');
-
-        // Find items to delete from subcollection
-        final querySnapshot = await listRef
-            .collection('items')
-            .where('itemId', isEqualTo: itemId)
-            .get();
-
-        debugPrint('Found ${querySnapshot.docs.length} items to delete from subcollection');
-
-        // Delete each item document
-        for (var doc in querySnapshot.docs) {
-          transaction.delete(doc.reference);
-        }
-
-        debugPrint('Items deleted from subcollection in transaction');
-      });
-
-      debugPrint('Transaction completed successfully');
+      debugPrint('Item removed successfully');
 
       // Update local list
       final updatedItemIds = _currentList!.itemIds.where((id) => id != itemId).toList();
@@ -513,47 +435,15 @@ class ListProvider extends ChangeNotifier {
         return false;
       }
 
-      // Use DIRECT string paths for collection references
-      final listRef = _firestore
-          .collection('users')  // Direct string instead of constant
-          .doc(currentUser.uid)
-          .collection('lists')  // Direct string instead of constant
-          .doc(_currentList!.id);
+      // Use UserService to delete the list
+      final success = await _userService.deleteList(_currentList!.id);
 
-      // First delete all items in the subcollection
-      debugPrint('Deleting items subcollection');
-
-      final itemsSnapshot = await listRef.collection('items').get();
-
-      if (itemsSnapshot.docs.isNotEmpty) {
-        debugPrint('Found ${itemsSnapshot.docs.length} items to delete');
-
-        // Use a batch for efficient deletion
-        final batch = _firestore.batch();
-        for (var doc in itemsSnapshot.docs) {
-          batch.delete(doc.reference);
-        }
-        await batch.commit();
-
-        debugPrint('Items deleted successfully');
-      } else {
-        debugPrint('No items to delete');
+      if (!success) {
+        _setError('Failed to delete list');
+        return false;
       }
 
-      // Now delete the list document
-      await listRef.delete();
-      debugPrint('List document deleted');
-
-      // Delete cover image if exists
-      if (_currentList!.coverImageUrl.isNotEmpty) {
-        try {
-          await _storageService.deleteImage(_currentList!.coverImageUrl);
-          debugPrint('Cover image deleted');
-        } catch (e) {
-          debugPrint('Error deleting cover image: $e');
-          // Continue even if image deletion fails
-        }
-      }
+      debugPrint('List deleted successfully');
 
       // Clear local data
       _currentList = null;
@@ -597,8 +487,6 @@ class ListProvider extends ChangeNotifier {
   }
 
   // Debug helpers
-
-  // Print information about the current state
   void debugState() {
     debugPrint('=== ListProvider Debug State ===');
     debugPrint('isLoading: $_isLoading');

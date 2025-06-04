@@ -59,22 +59,27 @@ class ProfileProvider extends ChangeNotifier {
     _clearError();
 
     try {
+      debugPrint('Getting user profile for UID: $uid');
+
       // Try to get existing profile first
       var profile = await _userService.getUserProfile(uid);
 
       // If profile is null, we might need to create it
       if (profile == null) {
         final User? currentUser = _auth.currentUser;
-        if (currentUser != null) {
+        if (currentUser != null && currentUser.uid == uid) {
+          debugPrint('Profile not found, creating new profile for current user');
+
           // Create a basic profile with username derived from email
-          String username = currentUser.email!.split('@')[0];
+          String email = currentUser.email ?? 'user@example.com';
+          String username = email.split('@')[0].toLowerCase();
           String nickname = username; // Default nickname is the same as username
 
           await _userService.createUserProfile(
-              uid: currentUser.uid,
-              email: currentUser.email!,
-              username: username,
-              nickname: nickname
+            uid: currentUser.uid,
+            email: email,
+            username: username,
+            nickname: nickname,
           );
 
           // Fetch the newly created profile
@@ -87,9 +92,15 @@ class ProfileProvider extends ChangeNotifier {
       if (profile == null) {
         throw Exception('Failed to load or create user profile');
       }
-      print('User profile loaded: ${profile.nickname}, Username: ${profile.username}');
+
+      debugPrint('User profile loaded successfully:');
+      debugPrint('- UID: ${profile.uid}');
+      debugPrint('- Email: ${profile.email}');
+      debugPrint('- Username: ${profile.username}');
+      debugPrint('- Nickname: ${profile.nickname}');
+
     } catch (e) {
-      print('Error getting user profile: $e');
+      debugPrint('Error getting user profile: $e');
       _setError('Failed to load user profile: $e');
     } finally {
       _setLoading(false);
@@ -120,7 +131,7 @@ class ProfileProvider extends ChangeNotifier {
 
       return deleted;
     } catch (e) {
-      print('Error in deleteListAndRefresh: $e');
+      debugPrint('Error in deleteListAndRefresh: $e');
       return false;
     }
   }
@@ -144,7 +155,7 @@ class ProfileProvider extends ChangeNotifier {
       }
       return '@$username';
     } catch (e) {
-      print('Error getting username: $e');
+      debugPrint('Error getting username: $e');
       _setError('Failed to load username: $e');
       return null;
     }
@@ -160,83 +171,62 @@ class ProfileProvider extends ChangeNotifier {
         throw Exception('Invalid UID: UID cannot be empty');
       }
 
-      print('Fetching lists for UID: $uid');
+      debugPrint('Fetching lists for UID: $uid');
 
       final lists = await _userService.getUserLists(uid);
       _userLists = lists;
 
       // Sort lists in memory by updatedAt
       _userLists.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+
+      debugPrint('Retrieved ${_userLists.length} lists');
     } catch (e) {
-      print('Error getting user lists `/Users/Documents/flutter/flutter_project/lib/features/profile/providers/profile_provider.dart lists`');
-      print('Retrieved ${_userLists.length} lists');
+      debugPrint('Error getting user lists: $e');
+      _setError('Failed to load lists: $e');
     } finally {
       _setLoading(false);
     }
   }
 
-  // Add an item to a list
+  // Add an item to a list - CORRECTED VERSION
   Future<bool> addItemToList(String listId, String itemId) async {
     try {
       final User? currentUser = _auth.currentUser;
       if (currentUser == null) {
-        print('Authentication Error: No authenticated user found');
+        debugPrint('Authentication Error: No authenticated user found');
         _setError('No authenticated user found');
         return false;
       }
 
-      print('Adding item $itemId to list $listId for user ${currentUser.uid}');
+      debugPrint('Adding item $itemId to list $listId for user ${currentUser.uid}');
 
-      final listDoc = await FirebaseFirestore.instance
-          .collection('lists')
-          .doc(listId)
-          .get();
+      // Use the UserService method instead of direct Firestore operations
+      final success = await _userService.addItemToList(
+        listId: listId,
+        itemId: itemId,
+        isMovie: true, // You might want to pass this as a parameter
+      );
 
-      if (!listDoc.exists) {
-        print('List $listId does not exist');
-        _setError('List does not exist');
-        return false;
+      if (success) {
+        debugPrint('Item $itemId added to list $listId successfully');
+
+        // Update local list if it exists in memory
+        final listIndex = _userLists.indexWhere((list) => list.id == listId);
+        if (listIndex != -1) {
+          final currentList = _userLists[listIndex];
+          final updatedItemIds = [...currentList.itemIds, itemId];
+          _userLists[listIndex] = currentList.copyWith(
+            itemIds: updatedItemIds,
+            itemCount: updatedItemIds.length,
+            updatedAt: DateTime.now(),
+          );
+          notifyListeners();
+        }
       }
 
-      final listData = listDoc.data()!;
-      if (listData['userId'] != currentUser.uid) {
-        print('Permission Error: User ${currentUser.uid} does not own list $listId');
-        _setError('You do not have permission to modify this list');
-        return false;
-      }
-
-      List<String> currentItemIds = List<String>.from(listData['itemIds'] ?? []);
-      if (currentItemIds.contains(itemId)) {
-        print('Item $itemId already in list $listId');
-        return true;
-      }
-
-      currentItemIds.add(itemId);
-
-      await FirebaseFirestore.instance
-          .collection('lists')
-          .doc(listId)
-          .update({
-        'itemIds': currentItemIds,
-        'itemCount': currentItemIds.length,
-        'updatedAt': Timestamp.fromDate(DateTime.now()),
-      });
-
-      print('Item $itemId added to list $listId successfully');
-
-      final index = _userLists.indexWhere((list) => list.id == listId);
-      if (index != -1) {
-        _userLists[index] = _userLists[index].copyWith(
-          itemIds: currentItemIds,
-          itemCount: currentItemIds.length,
-          updatedAt: DateTime.now(),
-        );
-        notifyListeners();
-      }
-
-      return true;
+      return success;
     } catch (e) {
-      print('Error adding item to list: $e');
+      debugPrint('Error adding item to list: $e');
       _setError('Failed to add item to list: $e');
       return false;
     }
@@ -256,7 +246,7 @@ class ProfileProvider extends ChangeNotifier {
       final watchlistMovies = await _movieService.getWatchlistMovies();
       _watchlistItems = watchlistMovies;
     } catch (e) {
-      print('Error getting watchlist items: $e');
+      debugPrint('Error getting watchlist items: $e');
       _setError('Failed to load watchlist items: $e');
     } finally {
       _isLoadingWatchlist = false;
@@ -278,7 +268,7 @@ class ProfileProvider extends ChangeNotifier {
       final favoriteMovies = await _movieService.getFavoriteMovies();
       _favoriteItems = favoriteMovies;
     } catch (e) {
-      print('Error getting favorite items: $e');
+      debugPrint('Error getting favorite items: $e');
       _setError('Failed to load favorite items: $e');
     } finally {
       _isLoadingFavorites = false;
@@ -306,7 +296,7 @@ class ProfileProvider extends ChangeNotifier {
       }
       return success;
     } catch (e) {
-      print('Error removing from watchlist: $e');
+      debugPrint('Error removing from watchlist: $e');
       _setError('Failed to remove from watchlist: $e');
       return false;
     }
@@ -322,7 +312,7 @@ class ProfileProvider extends ChangeNotifier {
       }
       return success;
     } catch (e) {
-      print('Error removing from favorites: $e');
+      debugPrint('Error removing from favorites: $e');
       _setError('Failed to remove from favorites: $e');
       return false;
     }
@@ -347,7 +337,7 @@ class ProfileProvider extends ChangeNotifier {
       await getUserProfile(currentUser.uid);
       return true;
     } catch (e) {
-      print('Error updating user profile: $e');
+      debugPrint('Error updating user profile: $e');
       _setError('Failed to update user profile: $e');
       return false;
     } finally {
@@ -366,17 +356,11 @@ class ProfileProvider extends ChangeNotifier {
         throw Exception('No authenticated user found');
       }
 
-      print('Uploading profile image for user: ${currentUser.uid}');
+      debugPrint('Uploading profile image for user: ${currentUser.uid}');
       final imageUrl = await _userService.uploadProfileImage(
         currentUser.uid,
         imageFile,
       );
-
-      // Update Firestore document directly to ensure it gets updated
-      await _firestore.collection('users').doc(currentUser.uid).update({
-        'profileImageUrl': imageUrl,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
 
       // Update local user profile
       if (_userProfile != null) {
@@ -388,7 +372,7 @@ class ProfileProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      print('Error uploading profile image: $e');
+      debugPrint('Error uploading profile image: $e');
       _setError('Failed to upload profile image: $e');
       return false;
     } finally {
@@ -407,17 +391,11 @@ class ProfileProvider extends ChangeNotifier {
         throw Exception('No authenticated user found');
       }
 
-      print('Uploading banner image for user: ${currentUser.uid}');
+      debugPrint('Uploading banner image for user: ${currentUser.uid}');
       final imageUrl = await _userService.uploadBannerImage(
         currentUser.uid,
         imageFile,
       );
-
-      // Update Firestore document directly to ensure it gets updated
-      await _firestore.collection('users').doc(currentUser.uid).update({
-        'bannerImageUrl': imageUrl,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
 
       // Update local user profile
       if (_userProfile != null) {
@@ -429,7 +407,7 @@ class ProfileProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      print('Error uploading banner image: $e');
+      debugPrint('Error uploading banner image: $e');
       _setError('Failed to upload banner image: $e');
       return false;
     } finally {
@@ -448,7 +426,7 @@ class ProfileProvider extends ChangeNotifier {
         throw Exception('No authenticated user found');
       }
 
-      print('Uploading list cover image for user: ${currentUser.uid}, list: $listId');
+      debugPrint('Uploading list cover image for user: ${currentUser.uid}, list: $listId');
       final storageService = await _userService.getStorageService();
       final imageUrl = await storageService.uploadListCoverImage(
         currentUser.uid,
@@ -458,6 +436,8 @@ class ProfileProvider extends ChangeNotifier {
 
       // Update list cover in Firestore directly
       await _firestore
+          .collection('users')
+          .doc(currentUser.uid)
           .collection('lists')
           .doc(listId)
           .update({
@@ -477,7 +457,7 @@ class ProfileProvider extends ChangeNotifier {
 
       return true;
     } catch (e) {
-      print('Error uploading list cover image: $e');
+      debugPrint('Error uploading list cover image: $e');
       _setError('Failed to upload list cover image: $e');
       return false;
     } finally {
@@ -485,7 +465,7 @@ class ProfileProvider extends ChangeNotifier {
     }
   }
 
-  // Create a new list
+  // Create a new list - CORRECTED VERSION
   Future<String?> createList({
     required String name,
     required String description,
@@ -497,56 +477,52 @@ class ProfileProvider extends ChangeNotifier {
     _setLoading(true);
     _clearError();
 
-    String? createdListId;
-
     try {
       final User? currentUser = _auth.currentUser;
       if (currentUser == null) {
         throw Exception('No authenticated user found');
       }
 
-      print('Creating list for user: ${currentUser.uid}');
+      debugPrint('Creating list for user: ${currentUser.uid}');
 
-      final now = DateTime.now();
-      final listData = {
-        'userId': currentUser.uid,
-        'name': name,
-        'description': description,
-        'coverImageUrl': '',
-        'isPublic': isPublic,
-        'allowMovies': allowMovies,
-        'allowTvShows': allowTvShows,
-        'itemIds': <String>[],
-        'createdAt': Timestamp.fromDate(now),
-        'updatedAt': Timestamp.fromDate(now),
-        'itemCount': 0,
-      };
+      // Use UserService to create the list
+      final newList = await _userService.createList(
+        name: name,
+        description: description,
+        isPublic: isPublic,
+        allowMovies: allowMovies,
+        allowTvShows: allowTvShows,
+      );
 
-      final docRef = await FirebaseFirestore.instance
-          .collection('lists')
-          .add(listData);
+      if (newList == null) {
+        throw Exception('Failed to create list');
+      }
 
-      createdListId = docRef.id;
-      print('List created with ID: $createdListId');
+      debugPrint('List created with ID: ${newList.id}');
 
+      // Upload cover image if provided
       if (coverImage != null) {
-        final success = await uploadListCoverImage(createdListId, coverImage);
-        if (!success) {
-          print('Warning: Failed to upload cover image, but list was created');
-          _setError('List created, but failed to upload cover image');
+        try {
+          final success = await uploadListCoverImage(newList.id, coverImage);
+          if (!success) {
+            debugPrint('Warning: Failed to upload cover image, but list was created');
+          }
+        } catch (e) {
+          debugPrint('Warning: Failed to upload cover image: $e');
+          // Don't fail the list creation for image upload failure
         }
       }
 
+      // Refresh the lists
       try {
         await getUserLists(currentUser.uid);
       } catch (e) {
-        print('Warning: Failed to refresh lists after creation: $e');
-        _setError('List created, but failed to refresh lists: $e');
+        debugPrint('Warning: Failed to refresh lists after creation: $e');
       }
 
-      return createdListId;
+      return newList.id;
     } catch (e) {
-      print('Error creating list: $e');
+      debugPrint('Error creating list: $e');
       _setError('Failed to create list: $e');
       return null;
     } finally {

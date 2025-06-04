@@ -2,10 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../../core/services/auth_service.dart';
-import '../../../core/services/firebase_service.dart';
+import '../../../core/services/user_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
+  final UserService _userService = UserService();
   bool _isLoading = true;
   User? _user;
   String? _error;
@@ -48,7 +49,7 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Register
+  // Register with proper user creation
   Future<bool> register(String email, String password) async {
     try {
       _isLoading = true;
@@ -57,12 +58,22 @@ class AuthProvider extends ChangeNotifier {
 
       final credential = await _authService.registerWithEmailAndPassword(email, password);
 
-      // Create user profile in Firestore
+      // Create user profile in Firestore with proper username
       if (credential.user != null) {
-        await FirebaseService.createUserProfile(
+        // Generate username from email
+        String username = email.split('@')[0].toLowerCase();
+
+        // Check if username exists and make it unique if needed
+        username = await _ensureUniqueUsername(username);
+
+        await _userService.createUserProfile(
           uid: credential.user!.uid,
           email: email,
+          username: username,
+          nickname: username, // Use username as initial nickname
         );
+
+        debugPrint('Successfully created user profile with username: $username');
       }
 
       _isLoading = false;
@@ -73,6 +84,38 @@ class AuthProvider extends ChangeNotifier {
       _error = _getErrorMessage(e);
       notifyListeners();
       return false;
+    } catch (e) {
+      _isLoading = false;
+      _error = 'Failed to create user profile: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Ensure username is unique
+  Future<String> _ensureUniqueUsername(String baseUsername) async {
+    try {
+      // Check if username already exists
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('username', isEqualTo: baseUsername)
+          .limit(1)
+          .get();
+
+      if (querySnapshot.docs.isEmpty) {
+        return baseUsername; // Username is available
+      }
+
+      // Generate unique username with timestamp
+      final timestamp = DateTime.now().millisecondsSinceEpoch.toString().substring(7);
+      final uniqueUsername = '${baseUsername}_$timestamp';
+
+      debugPrint('Username $baseUsername already exists, using $uniqueUsername');
+      return uniqueUsername;
+    } catch (e) {
+      // If there's an error checking, use timestamp-based username
+      final timestamp = DateTime.now().millisecondsSinceEpoch.toString().substring(7);
+      return '${baseUsername}_$timestamp';
     }
   }
 

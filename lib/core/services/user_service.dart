@@ -40,7 +40,13 @@ class UserService {
     String? nickname,
   }) async {
     try {
-      debugPrint('Creating user profile for $uid with email $email');
+      debugPrint('Creating user profile for $uid with email $email and username $username');
+
+      // Validate inputs
+      if (uid.isEmpty || email.isEmpty || username.isEmpty) {
+        throw Exception('Invalid user data: uid, email, and username are required');
+      }
+
       final userDoc = _usersCollection.doc(uid);
 
       // Check if user already exists
@@ -50,45 +56,43 @@ class UserService {
         return;
       }
 
-      // Check if username already exists
-      final usernameQuery = await _usersCollection
-          .where('username', isEqualTo: username)
-          .limit(1)
-          .get();
-
-      if (usernameQuery.docs.isNotEmpty) {
-        // Add a random number to make it unique
-        final randomSuffix = DateTime.now().millisecondsSinceEpoch.toString().substring(7);
-        username = '${username}_$randomSuffix';
-        debugPrint('Username already exists, changed to $username');
-      }
+      // Ensure username is unique
+      final uniqueUsername = await _ensureUniqueUsername(username, uid);
 
       // Generate a default nickname if not provided
-      nickname = nickname ?? username;
+      final userNickname = nickname?.isNotEmpty == true ? nickname! : uniqueUsername;
 
-      // Create user document with Timestamp for better compatibility
-      final UserModel newUser = UserModel(
-        uid: uid,
-        email: email,
-        username: username,
-        nickname: nickname,
-        createdAt: DateTime.now(),
-        lastLoginAt: DateTime.now(),
-      );
+      // Create user document with proper timestamp handling
+      final now = DateTime.now();
+      final userData = {
+        'uid': uid,
+        'email': email,
+        'username': uniqueUsername,
+        'nickname': userNickname,
+        'profileImageUrl': '',
+        'bannerImageUrl': '',
+        'isModerator': false,
+        'isVerified': false,
+        'createdAt': FieldValue.serverTimestamp(),
+        'lastLoginAt': FieldValue.serverTimestamp(),
+      };
 
-      final userData = newUser.toMap();
+      // Use a transaction to ensure atomicity
+      await _firestore.runTransaction((transaction) async {
+        // Double-check user doesn't exist
+        final userExists = await transaction.get(userDoc);
+        if (userExists.exists) {
+          debugPrint('User already exists, skipping creation');
+          return;
+        }
 
-      // Convert DateTime to Timestamp for Firestore
-      userData['createdAt'] = Timestamp.fromDate(newUser.createdAt);
-      userData['lastLoginAt'] = Timestamp.fromDate(newUser.lastLoginAt);
+        // Set user document
+        transaction.set(userDoc, userData);
 
-      await userDoc.set(userData);
-      debugPrint('Successfully created user profile for $uid');
+        debugPrint('User document created in transaction');
+      });
 
-      // Create default collections
-      userDoc.collection('lists').doc(); // Create the lists collection
-      userDoc.collection('watchlist').doc(); // Create the watchlist collection
-      userDoc.collection('favorites').doc(); // Create the favorites collection
+      debugPrint('Successfully created user profile for $uid with username: $uniqueUsername');
 
     } catch (e) {
       debugPrint('Error creating user profile: $e');
@@ -96,10 +100,45 @@ class UserService {
     }
   }
 
+  // Ensure username is unique
+  Future<String> _ensureUniqueUsername(String baseUsername, String currentUid) async {
+    try {
+      // Check if username already exists (excluding current user)
+      final querySnapshot = await _usersCollection
+          .where('username', isEqualTo: baseUsername)
+          .limit(1)
+          .get();
+
+      // If no documents or the document is for the current user, username is available
+      if (querySnapshot.docs.isEmpty ||
+          (querySnapshot.docs.length == 1 && querySnapshot.docs.first.id == currentUid)) {
+        return baseUsername;
+      }
+
+      // Generate unique username with timestamp
+      final timestamp = DateTime.now().millisecondsSinceEpoch.toString().substring(7);
+      final uniqueUsername = '${baseUsername}_$timestamp';
+
+      debugPrint('Username $baseUsername already exists, using $uniqueUsername');
+      return uniqueUsername;
+    } catch (e) {
+      debugPrint('Error checking username uniqueness: $e');
+      // If there's an error checking, use timestamp-based username
+      final timestamp = DateTime.now().millisecondsSinceEpoch.toString().substring(7);
+      return '${baseUsername}_$timestamp';
+    }
+  }
+
   // Get user data from Firestore with improved error handling
   Future<UserModel?> getUserProfile(String uid) async {
     try {
       debugPrint('Getting user profile for $uid');
+
+      if (uid.isEmpty) {
+        debugPrint('Empty UID provided');
+        return null;
+      }
+
       final userDoc = await _usersCollection.doc(uid).get();
 
       if (!userDoc.exists) {
@@ -109,11 +148,12 @@ class UserService {
         final currentUser = _auth.currentUser;
         if (currentUser != null && currentUser.uid == uid && currentUser.email != null) {
           debugPrint('Attempting to create profile for current user');
-          String username = currentUser.email!.split('@')[0];
+          String username = currentUser.email!.split('@')[0].toLowerCase();
           await createUserProfile(
             uid: uid,
             email: currentUser.email!,
             username: username,
+            nickname: username,
           );
 
           // Get the newly created user
@@ -126,8 +166,26 @@ class UserService {
         return null;
       }
 
+      final userData = userDoc.data() as Map<String, dynamic>;
+
+      // Ensure required fields exist
+      if (!userData.containsKey('username') || userData['username'] == null || userData['username'].toString().isEmpty) {
+        debugPrint('User profile missing username, updating...');
+        // Generate username from email if missing
+        String username = userData['email']?.split('@')[0]?.toLowerCase() ?? 'user${DateTime.now().millisecondsSinceEpoch}';
+        username = await _ensureUniqueUsername(username, uid);
+
+        await _usersCollection.doc(uid).update({
+          'username': username,
+          'nickname': userData['nickname'] ?? username,
+        });
+
+        userData['username'] = username;
+        userData['nickname'] = userData['nickname'] ?? username;
+      }
+
       debugPrint('Successfully retrieved user profile for $uid');
-      return UserModel.fromMap(userDoc.data() as Map<String, dynamic>, uid);
+      return UserModel.fromMap(userData, uid);
     } catch (e) {
       debugPrint('Error getting user profile: $e');
       return null;
@@ -145,6 +203,10 @@ class UserService {
       debugPrint('Updating user profile for $uid');
       debugPrint('nickname: $nickname, profileImageUrl: $profileImageUrl, bannerImageUrl: $bannerImageUrl');
 
+      if (uid.isEmpty) {
+        throw Exception('UID cannot be empty');
+      }
+
       final userDoc = _usersCollection.doc(uid);
       final Map<String, dynamic> data = {};
 
@@ -155,7 +217,9 @@ class UserService {
       // Only update if there are changes
       if (data.isNotEmpty) {
         data['lastLoginAt'] = FieldValue.serverTimestamp();
-        await userDoc.update(data);
+
+        // Use merge to avoid overwriting other fields
+        await userDoc.set(data, SetOptions(merge: true));
         debugPrint('Successfully updated user profile for $uid');
       } else {
         debugPrint('No changes to update for user $uid');
@@ -169,9 +233,11 @@ class UserService {
   // Update last login timestamp
   Future<void> updateLastLogin(String uid) async {
     try {
-      await _usersCollection.doc(uid).update({
+      if (uid.isEmpty) return;
+
+      await _usersCollection.doc(uid).set({
         'lastLoginAt': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(merge: true));
       debugPrint('Updated last login for $uid');
     } catch (e) {
       debugPrint('Error updating last login: $e');
@@ -182,33 +248,25 @@ class UserService {
   // Upload profile image to Firebase Storage with improved path handling
   Future<String> uploadProfileImage(String userId, File imageFile) async {
     try {
-      // Generate a unique filename with timestamp
-      final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
-      final String extension = path.extension(imageFile.path);
+      debugPrint('Starting profile image upload for user: $userId');
 
-      // Use a path compatible with Firebase storage rules
-      final storageRef = _storage.ref()
-          .child('users')
-          .child(userId)
-          .child('profile_$timestamp$extension');
+      if (userId.isEmpty) {
+        throw Exception('User ID cannot be empty');
+      }
 
-      debugPrint('Uploading profile image to path: ${storageRef.fullPath}');
+      // Validate the image file first
+      final isValid = await _storageService.validateImageFile(imageFile);
+      if (!isValid) {
+        throw Exception('Invalid image file');
+      }
 
-      // Upload file with content type
-      final uploadTask = storageRef.putFile(
-        imageFile,
-        SettableMetadata(contentType: 'image/${extension.substring(1)}'),
-      );
-
-      // Get download URL
-      final snapshot = await uploadTask;
-      final imageUrl = await snapshot.ref.getDownloadURL();
-
-      debugPrint('Successfully uploaded profile image, URL: $imageUrl');
+      // Upload using storage service
+      final imageUrl = await _storageService.uploadProfileImage(userId, imageFile);
 
       // Update user profile with the URL
       await updateUserProfile(uid: userId, profileImageUrl: imageUrl);
 
+      debugPrint('Successfully uploaded and updated profile image for $userId');
       return imageUrl;
     } catch (e) {
       debugPrint('Error uploading profile image: $e');
@@ -219,33 +277,25 @@ class UserService {
   // Upload banner image to Firebase Storage with improved path handling
   Future<String> uploadBannerImage(String userId, File imageFile) async {
     try {
-      // Generate a unique filename with timestamp
-      final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
-      final String extension = path.extension(imageFile.path);
+      debugPrint('Starting banner image upload for user: $userId');
 
-      // Use a path compatible with Firebase storage rules
-      final storageRef = _storage.ref()
-          .child('users')
-          .child(userId)
-          .child('banner_$timestamp$extension');
+      if (userId.isEmpty) {
+        throw Exception('User ID cannot be empty');
+      }
 
-      debugPrint('Uploading banner image to path: ${storageRef.fullPath}');
+      // Validate the image file first
+      final isValid = await _storageService.validateImageFile(imageFile);
+      if (!isValid) {
+        throw Exception('Invalid image file');
+      }
 
-      // Upload file with content type
-      final uploadTask = storageRef.putFile(
-        imageFile,
-        SettableMetadata(contentType: 'image/${extension.substring(1)}'),
-      );
-
-      // Get download URL
-      final snapshot = await uploadTask;
-      final imageUrl = await snapshot.ref.getDownloadURL();
-
-      debugPrint('Successfully uploaded banner image, URL: $imageUrl');
+      // Upload using storage service
+      final imageUrl = await _storageService.uploadBannerImage(userId, imageFile);
 
       // Update user profile with the URL
       await updateUserProfile(uid: userId, bannerImageUrl: imageUrl);
 
+      debugPrint('Successfully uploaded and updated banner image for $userId');
       return imageUrl;
     } catch (e) {
       debugPrint('Error uploading banner image: $e');
@@ -285,9 +335,18 @@ class UserService {
               data['updatedAt'] = Timestamp.now();
             }
 
+            // Ensure itemIds is a list
+            if (data['itemIds'] == null) {
+              data['itemIds'] = [];
+            }
+
+            // Ensure itemCount matches itemIds length
+            final itemIds = List<String>.from(data['itemIds'] ?? []);
+            data['itemCount'] = itemIds.length;
+
             validLists.add(ListModel.fromMap(data, doc.id));
           } else {
-            debugPrint('Skipping invalid list document: ${doc.id}');
+            debugPrint('Skipping invalid list document: ${doc.id} - missing required fields');
           }
         } catch (e) {
           debugPrint('Error processing list document ${doc.id}: $e');
@@ -331,13 +390,17 @@ class UserService {
         'allowMovies': allowMovies,
         'allowTvShows': allowTvShows,
         'itemIds': [],
-        'createdAt': Timestamp.fromDate(now),
-        'updatedAt': Timestamp.fromDate(now),
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
         'itemCount': 0,
       };
 
       final docRef = await getUserListsCollection(userId).add(listData);
       debugPrint('Successfully created list with ID: ${docRef.id}');
+
+      // Return the created list
+      listData['createdAt'] = Timestamp.fromDate(now);
+      listData['updatedAt'] = Timestamp.fromDate(now);
       return ListModel.fromMap(listData, docRef.id);
     } catch (e) {
       debugPrint('Error creating list: $e');
@@ -399,8 +462,7 @@ class UserService {
       if (coverImageUrl.isNotEmpty) {
         try {
           debugPrint('Deleting list cover image: $coverImageUrl');
-          final ref = _storage.refFromURL(coverImageUrl);
-          await ref.delete();
+          await _storageService.deleteImage(coverImageUrl);
         } catch (e) {
           // Ignore errors when deleting images
           debugPrint('Error deleting list cover image: $e');
@@ -432,38 +494,43 @@ class UserService {
       }
 
       final listRef = getUserListsCollection(currentUser.uid).doc(listId);
-      final listDoc = await listRef.get();
 
-      if (!listDoc.exists) {
-        debugPrint('List not found: $listId');
-        return false;
-      }
+      // Use transaction for atomic operation
+      return await _firestore.runTransaction((transaction) async {
+        final listDoc = await transaction.get(listRef);
 
-      final listData = listDoc.data() as Map<String, dynamic>;
-      final List<dynamic> itemIds = List<dynamic>.from(listData['itemIds'] ?? []);
+        if (!listDoc.exists) {
+          debugPrint('List not found: $listId');
+          return false;
+        }
 
-      // Check if item already exists in the list
-      if (itemIds.contains(itemId)) {
-        debugPrint('Item already exists in list');
-        return true; // Item already exists, consider it success
-      }
+        final listData = listDoc.data() as Map<String, dynamic>;
+        final List<dynamic> itemIds = List<dynamic>.from(listData['itemIds'] ?? []);
 
-      // Update the list document
-      await listRef.update({
-        'itemIds': FieldValue.arrayUnion([itemId]),
-        'itemCount': FieldValue.increment(1),
-        'updatedAt': FieldValue.serverTimestamp(),
+        // Check if item already exists in the list
+        if (itemIds.contains(itemId)) {
+          debugPrint('Item already exists in list');
+          return true; // Item already exists, consider it success
+        }
+
+        // Update the list document
+        transaction.update(listRef, {
+          'itemIds': FieldValue.arrayUnion([itemId]),
+          'itemCount': FieldValue.increment(1),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+
+        // Add to items subcollection
+        final itemRef = listRef.collection('items').doc();
+        transaction.set(itemRef, {
+          'itemId': itemId,
+          'isMovie': isMovie,
+          'addedAt': FieldValue.serverTimestamp(),
+        });
+
+        debugPrint('Successfully added item to list');
+        return true;
       });
-
-      // Add to items subcollection
-      await listRef.collection('items').add({
-        'itemId': itemId,
-        'isMovie': isMovie,
-        'addedAt': FieldValue.serverTimestamp(),
-      });
-
-      debugPrint('Successfully added item to list');
-      return true;
     } catch (e) {
       debugPrint('Error adding item to list: $e');
       return false;
@@ -484,31 +551,44 @@ class UserService {
       }
 
       final listRef = getUserListsCollection(currentUser.uid).doc(listId);
-      final listDoc = await listRef.get();
 
-      if (!listDoc.exists) {
-        debugPrint('List not found: $listId');
-        return false;
-      }
+      // Use transaction for atomic operation
+      return await _firestore.runTransaction((transaction) async {
+        final listDoc = await transaction.get(listRef);
 
-      // Update the list
-      await listRef.update({
-        'itemIds': FieldValue.arrayRemove([itemId]),
-        'itemCount': FieldValue.increment(-1),
-        'updatedAt': FieldValue.serverTimestamp(),
+        if (!listDoc.exists) {
+          debugPrint('List not found: $listId');
+          return false;
+        }
+
+        // Update the list
+        transaction.update(listRef, {
+          'itemIds': FieldValue.arrayRemove([itemId]),
+          'itemCount': FieldValue.increment(-1),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+
+        // Note: We'll handle items subcollection deletion outside the transaction
+        debugPrint('Successfully removed item from list');
+        return true;
+      }).then((success) async {
+        if (success) {
+          // Remove from items subcollection (outside transaction)
+          try {
+            final itemsQuery = await listRef.collection('items')
+                .where('itemId', isEqualTo: itemId)
+                .get();
+
+            for (var doc in itemsQuery.docs) {
+              await doc.reference.delete();
+            }
+          } catch (e) {
+            debugPrint('Error cleaning up items subcollection: $e');
+            // Don't fail the operation for this
+          }
+        }
+        return success;
       });
-
-      // Remove from items subcollection
-      final itemsQuery = await listRef.collection('items')
-          .where('itemId', isEqualTo: itemId)
-          .get();
-
-      for (var doc in itemsQuery.docs) {
-        await doc.reference.delete();
-      }
-
-      debugPrint('Successfully removed item from list');
-      return true;
     } catch (e) {
       debugPrint('Error removing item from list: $e');
       return false;
