@@ -132,11 +132,11 @@ class _CastCard extends StatelessWidget {
                         color: Colors.black.withOpacity(0.1),
                       ),
                       child: const Center(
-                        child: Icon(
+                        /*child: Icon(
                           Icons.info_outline,
                           color: Colors.white,
                           size: 20,
-                        ),
+                        ),*/
                       ),
                     ),
                   ),

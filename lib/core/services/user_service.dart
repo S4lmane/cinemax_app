@@ -108,7 +108,7 @@ class UserService {
           .where('username', isEqualTo: baseUsername)
           .limit(1)
           .get();
-
+// and to get
       // If no documents or the document is for the current user, username is available
       if (querySnapshot.docs.isEmpty ||
           (querySnapshot.docs.length == 1 && querySnapshot.docs.first.id == currentUid)) {
